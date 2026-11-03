@@ -1,4 +1,4 @@
-﻿// SmartPiggy Cloud - Bundle Compatible con HTTP Server, GitHub Pages y file:// directo
+﻿// SmartPiggy Cloud - Bundle PWA Instalable + Modales Mobile Full-Width + Supabase Realtime
 (function() {
 'use strict';
 
@@ -2120,6 +2120,7 @@ class SmartPiggyApp {
     this.inactivityTimer = null;
     this.auditResult = { validEvents: [], corruptedEvents: [], isClean: true };
     this.txFilter = 'ALL';
+    this.deferredInstallPrompt = null;
 
     this.cloudManager = new CloudSyncManager({
       onRemoteStateMerged: (remoteState, sourceLabel) => this.handleRemoteStateMerged(remoteState, sourceLabel),
@@ -2168,6 +2169,7 @@ class SmartPiggyApp {
     }
 
     this.bindEvents();
+    this.initPwaInstallSupport();
     this.populateCloudConfigInputs();
     this.updateSimulatorPreviews();
     this.updateLoanModalPreview();
@@ -2178,6 +2180,59 @@ class SmartPiggyApp {
     await this.cloudManager.pullFromCloud(this.state, true);
     await this.cloudManager.pushState(this.state);
     this.cloudManager.startPolling(() => this.state);
+  }
+
+  initPwaInstallSupport() {
+    // 1. Registrar Service Worker para habilitar instalación PWA y funcionamiento offline
+    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
+    const btnInstall = document.getElementById('btnInstallPwa');
+    const nativeSection = document.getElementById('nativeInstallPromptSection');
+    const btnTriggerNative = document.getElementById('btnTriggerNativeInstall');
+
+    // Si ya se está ejecutando como App Instalada (standalone), ocultar el botón de instalar
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone && btnInstall) {
+      btnInstall.style.display = 'none';
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredInstallPrompt = e;
+      if (btnInstall) btnInstall.style.display = 'inline-flex';
+      if (nativeSection) nativeSection.style.display = 'block';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      this.deferredInstallPrompt = null;
+      if (btnInstall) btnInstall.style.display = 'none';
+      document.getElementById('dialogInstallPwa')?.close();
+      this.showToast('SmartPiggy Cloud se instaló correctamente en tu dispositivo.', 'success');
+    });
+
+    btnInstall?.addEventListener('click', async () => {
+      if (this.deferredInstallPrompt) {
+        this.deferredInstallPrompt.prompt();
+        const choice = await this.deferredInstallPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          this.deferredInstallPrompt = null;
+        }
+      } else {
+        document.getElementById('dialogInstallPwa')?.showModal();
+      }
+    });
+
+    btnTriggerNative?.addEventListener('click', async () => {
+      if (this.deferredInstallPrompt) {
+        this.deferredInstallPrompt.prompt();
+        await this.deferredInstallPrompt.userChoice;
+        this.deferredInstallPrompt = null;
+        document.getElementById('dialogInstallPwa')?.close();
+      }
+    });
   }
 
   normalizeLegacyIconsToSvg() {

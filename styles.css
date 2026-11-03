@@ -720,7 +720,7 @@ body[data-role="CHILD"] .parent-only {
   margin-bottom: 1rem;
 }
 
-/* Native HTML <dialog> Modals with Modern Web Guidance Animations */
+/* Native HTML <dialog> Modals with Modern Web Guidance Animations & Mobile Full-Width Fit */
 dialog.app-dialog {
   background: var(--bg-card);
   color: var(--text-primary);
@@ -728,7 +728,10 @@ dialog.app-dialog {
   border-radius: var(--radius-lg);
   padding: 0;
   max-width: 560px;
-  width: calc(100% - 2rem);
+  width: calc(100vw - 1.5rem);
+  max-height: 92dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65);
   opacity: 0;
   transform: translateY(12px) scale(0.98);
@@ -758,12 +761,14 @@ dialog.app-dialog::backdrop {
 
 .dialog-inner {
   padding: 1.5rem;
+  width: 100%;
 }
 
 .dialog-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 1.15rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border-subtle);
@@ -787,6 +792,8 @@ dialog.app-dialog::backdrop {
   flex-direction: column;
   gap: 0.35rem;
   margin-bottom: 0.85rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .form-group.full {
@@ -802,6 +809,9 @@ dialog.app-dialog::backdrop {
 .form-input,
 .form-select,
 .form-textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.62rem 0.85rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
@@ -852,4 +862,62 @@ dialog.app-dialog::backdrop {
   font-size: 0.85rem;
   font-weight: 600;
   max-width: 360px;
+}
+
+/* ==========================================================================
+   AJUSTES RESPONSIVOS PARA CELULARES (Ventanas Emergentes al 100% del Ancho)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .app-header {
+    padding: 0.8rem 0.9rem;
+  }
+
+  .app-container {
+    padding: 0.9rem;
+  }
+
+  .equal-col-grid {
+    grid-template-columns: 1fr;
+  }
+
+  dialog.app-dialog {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: auto 0 0 0 !important;
+    border-radius: 20px 20px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    max-height: 92dvh;
+  }
+
+  .dialog-inner {
+    padding: 1.1rem 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px)) 1rem;
+  }
+
+  .dialog-title {
+    font-size: 1rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-size: 16px; /* Evita auto-zoom en iOS/Android al tocar un campo */
+  }
+
+  .toast-container {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .toast {
+    max-width: 100%;
+    width: 100%;
+  }
 }

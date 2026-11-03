@@ -2,8 +2,17 @@
 <html lang="es" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>SmartPiggy Cloud — Alcancías Digitales Familiares</title>
+  <meta name="description" content="Control de alcancías digitales para niños y jóvenes con ingresos, gastos, créditos, inversiones y sincronización en tiempo real." />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SmartPiggy" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -44,6 +53,11 @@
       </div>
 
       <div class="header-controls">
+        <button type="button" class="btn btn-primary btn-sm" id="btnInstallPwa" title="Instalar aplicación en tu celular, tablet o computadora">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Instalar App
+        </button>
+
         <button type="button" class="cloud-pill" id="btnOpenCloudDialog" title="Configurar Base de Datos en la Nube y Multi-Dispositivo">
           <span class="cloud-dot" id="cloudStatusDot"></span>
           <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
@@ -1005,6 +1019,52 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
           <button type="submit" class="btn btn-primary">Guardar en Catálogo</button>
         </div>
       </form>
+    </div>
+  </dialog>
+
+  <!-- 9. Modal de Instalación de la Aplicación (PWA en Celulares y PC) -->
+  <dialog class="app-dialog" id="dialogInstallPwa">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h3 class="dialog-title inline-icon-text">
+          <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Instalar SmartPiggy en tu Dispositivo
+        </h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogInstallPwa" aria-label="Cerrar">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="font-size: 0.88rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.9rem;">
+        <p style="margin: 0;">
+          Instala <strong>SmartPiggy Cloud</strong> como una aplicación nativa a pantalla completa en tu celular, tablet o computadora:
+        </p>
+
+        <div id="nativeInstallPromptSection" style="display: none; background: var(--color-income-bg); border: 1px solid var(--color-income); padding: 0.9rem; border-radius: var(--radius-md);">
+          <p style="margin: 0 0 0.6rem 0; color: var(--text-primary); font-weight: 700;">
+            Tu navegador permite instalación directa en 1 clic:
+          </p>
+          <button type="button" class="btn btn-income" id="btnTriggerNativeInstall" style="width: 100%;">
+            <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Instalar Aplicación Ahora
+          </button>
+        </div>
+
+        <div style="background: var(--bg-elevated); padding: 0.9rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          <strong style="color: var(--text-primary); display: block; margin-bottom: 0.35rem;">En Android (Chrome / Edge / Samsung Internet):</strong>
+          1. Toca el menú de 3 puntos <strong>(⋮)</strong> arriba a la derecha.<br />
+          2. Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.
+        </div>
+
+        <div style="background: var(--bg-elevated); padding: 0.9rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          <strong style="color: var(--text-primary); display: block; margin-bottom: 0.35rem;">En iPhone / iPad (Safari):</strong>
+          1. Toca el botón <strong>Compartir</strong> (cuadro con flecha hacia arriba en la barra inferior).<br />
+          2. Desliza hacia abajo y toca <strong>"Agregar a inicio"</strong> (Add to Home Screen).
+        </div>
+
+        <div style="display: flex; justify-content: flex-end;">
+          <button type="button" class="btn btn-primary" data-close-dialog="dialogInstallPwa">Entendido</button>
+        </div>
+      </div>
     </div>
   </dialog>
 
