@@ -1,0 +1,5 @@
+# Archivos locales temporales y base de datos local de pruebas
+cloud_db.json
+.DS_Store
+Thumbs.db
+*.log
