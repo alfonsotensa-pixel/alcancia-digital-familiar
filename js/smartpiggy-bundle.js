@@ -1,8 +1,12 @@
-﻿// SmartPiggy Cloud - Bundle PWA Instalable + Modales Mobile Full-Width + Supabase Realtime
-(function() {
-'use strict';
+/**
+ * SmartPiggy Cloud - Bundle Integral (100% SVG, Criptografia HMAC-SHA256, Motor Financiero y Auto-Sync)
+ */
+(function () {
+  'use strict';
 
-// --- Archivo: icons.js ---
+  // ==========================================================================
+  // MODULE: icons.js
+  // ==========================================================================
 /**
  * SmartPiggy Cloud - Sistema Integral de Iconografía SVG Vectorial
  * Reemplaza todos los iconos por gráficos vectoriales SVG escalables (<svg viewBox="0 0 24 24">),
@@ -157,7 +161,9 @@ function renderSvgIcon(keyOrLegacy, size = 18, extraClass = '') {
 }
 
 
-// --- Archivo: crypto-ledger.js ---
+  // ==========================================================================
+  // MODULE: crypto-ledger.js
+  // ==========================================================================
 /**
  * SmartPiggy Cloud - Motor Criptográfico y de Integridad del Libro Mayor (Ronda 2 Auditado)
  * Implementa:
@@ -443,7 +449,9 @@ async function auditLedgerEvents(events, familySaltHex, parentSigningKey = null)
 }
 
 
-// --- Archivo: financial-engine.js ---
+  // ==========================================================================
+  // MODULE: financial-engine.js
+  // ==========================================================================
 /**
  * SmartPiggy Cloud - Motor Financiero Determinista y Reductor Event-Sourced (Ronda 2 Auditado)
  * - 100% aritmética en enteros (centavos) sin errores de punto flotante IEEE 754.
@@ -1014,7 +1022,9 @@ function findDueDeterministicAutomations(appState, referenceLocalDate = getToday
 }
 
 
-// --- Archivo: cloud-sync.js ---
+  // ==========================================================================
+  // MODULE: cloud-sync.js
+  // ==========================================================================
 /**
  * SmartPiggy Cloud - Motor de Sincronización en Tiempo Real con Supabase (Proyecto Existente) + CRDT G-Set
  * Características clave:
@@ -1556,12 +1566,15 @@ class CloudSyncManager {
 }
 
 
-// --- Archivo: seed-data.js ---
+  // ==========================================================================
+  // MODULE: seed-data.js
+  // ==========================================================================
 /**
  * SmartPiggy Cloud - Generador de Estado Inicial Semilla Criptográficamente Firmado
  * Crea una familia de demostración completa con todas las entidades firmadas con HMAC-SHA256
  * y claves de iconografía 100% SVG vectorial.
  */
+
 
 const DEFAULT_DEMO_PIN = '1234';
 
@@ -2097,7 +2110,9 @@ async function buildInitialSignedFamilyState(customFamilyCode = 'FAM-2026-KIDS',
 }
 
 
-// --- Archivo: app.js ---
+  // ==========================================================================
+  // MODULE: app.js
+  // ==========================================================================
 /**
  * SmartPiggy Cloud - Controlador Principal de la Aplicación (100% Iconografía SVG)
  * Integra:
@@ -2110,6 +2125,10 @@ async function buildInitialSignedFamilyState(customFamilyCode = 'FAM-2026-KIDS',
  * - Sincronización en la nube multi-dispositivo (Zero-Config Cloud + Firebase RTDB + Supabase REST).
  */
 
+
+
+
+
 class SmartPiggyApp {
   constructor() {
     this.state = null;
@@ -2121,6 +2140,7 @@ class SmartPiggyApp {
     this.auditResult = { validEvents: [], corruptedEvents: [], isClean: true };
     this.txFilter = 'ALL';
     this.deferredInstallPrompt = null;
+    this.pendingAfterPinAction = null;
 
     this.cloudManager = new CloudSyncManager({
       onRemoteStateMerged: (remoteState, sourceLabel) => this.handleRemoteStateMerged(remoteState, sourceLabel),
@@ -2135,18 +2155,23 @@ class SmartPiggyApp {
       this.cloudManager.familyCode = urlFamilyCode.trim().toUpperCase();
     }
 
-    // Si el enlace compartido incluye configuración de conexión en tiempo real (ideal para GitHub Pages)
+    // Si el enlace compartido incluye configuración de conexión en tiempo real (ideal para GitHub Pages y WhatsApp)
     const sbParam = params.get('sb');
     if (sbParam) {
       try {
         const decoded = JSON.parse(atob(sbParam));
-        if (decoded && decoded.u && decoded.k) {
-          this.cloudManager.saveCloudConfig({
-            provider: decoded.p || 'SUPABASE_REST',
-            endpointUrl: decoded.u,
-            apiKey: decoded.k,
-            tableName: decoded.t || 'smartpiggy_families'
-          });
+        if (decoded) {
+          if (decoded.f) {
+            this.cloudManager.familyCode = String(decoded.f).trim().toUpperCase();
+          }
+          if (decoded.u && decoded.k) {
+            this.cloudManager.saveCloudConfig({
+              provider: decoded.p || 'SUPABASE_REST',
+              endpointUrl: decoded.u,
+              apiKey: decoded.k,
+              tableName: decoded.t || 'smartpiggy_families'
+            });
+          }
         }
       } catch {
         // ignore invalid sb param
@@ -2351,7 +2376,7 @@ class SmartPiggyApp {
 
   ensureParentPermission() {
     if (this.currentRole !== 'PARENT' || !this.parentSigningKey) {
-      this.showToast('Acción protegida: Desbloquea el Modo Papá con tu PIN para modificar datos.', 'warn');
+      this.showToast('Pide a Papá o Mamá que ponga su PIN para guardar cambios.', 'warn');
       this.openParentPinDialog();
       return false;
     }
@@ -2363,12 +2388,12 @@ class SmartPiggyApp {
     if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
     if (this.currentRole === 'PARENT') {
       this.inactivityTimer = setTimeout(() => {
-        this.lockToChildMode('Sesión de Modo Papá cerrada automáticamente por inactividad (3 min).');
+        this.lockToChildMode('Se volvió a Vista Hijo automáticamente después de 3 minutos sin uso.');
       }, 3 * 60 * 1000);
     }
   }
 
-  lockToChildMode(reasonMsg = 'Modo Hijo (Solo Lectura) activado. Llave de firma eliminada de la memoria.') {
+  lockToChildMode(reasonMsg = 'Vista Hijo activada. Tu alcancía está protegida contra cambios.') {
     this.currentRole = 'CHILD';
     this.parentSigningKey = null;
     if (this.inactivityTimer) clearTimeout(this.inactivityTimer);
@@ -2386,7 +2411,7 @@ class SmartPiggyApp {
     if (selectParent) {
       const parents = this.getParents();
       selectParent.innerHTML = parents
-        .map((p) => `<option value="${p.id}" ${p.id === this.activeParentId ? 'selected' : ''}>${p.name} (${p.title || 'Administrador'})</option>`)
+        .map((p) => `<option value="${p.id}" ${p.id === this.activeParentId ? 'selected' : ''}>${p.name} (${p.title || 'Papá/Mamá'})</option>`)
         .join('');
     }
     if (errBox) errBox.style.display = 'none';
@@ -2410,7 +2435,13 @@ class SmartPiggyApp {
 
     await this.consolidateDueAutomationsAsParent(true);
     await this.runLedgerAuditAndRender();
-    this.showToast('Modo Papá desbloqueado. Firma criptográfica HMAC-SHA256 activa.', 'success');
+    this.showToast('¡Modo Papá activado! Ya puedes añadir movimientos o aprobar pedidos.', 'success');
+
+    if (typeof this.pendingAfterPinAction === 'function') {
+      const nextFn = this.pendingAfterPinAction;
+      this.pendingAfterPinAction = null;
+      setTimeout(() => nextFn(), 80);
+    }
     return true;
   }
 
@@ -2567,15 +2598,15 @@ class SmartPiggyApp {
       const parentObj = this.getParents().find((p) => p.id === this.activeParentId) || { name: 'Papá/Mamá', avatar: 'parent-male' };
       roleStatusText.innerHTML = `
         ${renderSvgIcon('unlock', 18)}
-        <span><strong>MODO PAPÁ ACTIVO (${parentObj.name}):</strong> Tienes control total para registrar ingresos, descontar gastos, otorgar créditos, crear inversiones y administrar catálogos.</span>
+        <span><strong>MODO PAPÁ ACTIVO (${parentObj.name}):</strong> Ya puedes meter dinero, anotar gastos, aprobar pedidos o crear préstamos.</span>
       `;
-      btnToggleRole.innerHTML = `${renderSvgIcon('eye', 16)} Cambiar a Vista Hijo (Bloquear Edición)`;
+      btnToggleRole.innerHTML = `${renderSvgIcon('eye', 16)} Volver a Vista Hijo`;
     } else {
       roleStatusText.innerHTML = `
         ${renderSvgIcon('eye', 18)}
-        <span><strong>VISTA HIJO (SOLO LECTURA PROTEGIDA):</strong> Explora tu alcancía, inversiones y créditos o usa el Laboratorio Financiero. Solo Papá/Mamá pueden modificar datos con su PIN.</span>
+        <span><strong>VISTA HIJO (SOLO VER):</strong> Mira tu alcancía, tus metas y usa la Calculadora. Para anotar o cambiar algo, pide a Papá o Mamá su PIN.</span>
       `;
-      btnToggleRole.innerHTML = `${renderSvgIcon('lock', 16)} Entrar a Modo Papá (PIN)`;
+      btnToggleRole.innerHTML = `${renderSvgIcon('lock', 16)} Modo Papá (PIN)`;
     }
 
     // 2. Pestañas de perfiles de hijos con avatares SVG
@@ -2599,7 +2630,7 @@ class SmartPiggyApp {
             </span>
             <div style="text-align: left;">
               <div>${c.name} <span style="font-weight: 500; font-size: 0.76rem; color: var(--text-muted);">(${c.age || ''} años)</span></div>
-              <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-income);">${formatMoneyCents(cState.availableCents, currency)} disp.</div>
+              <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-income);">${formatMoneyCents(cState.availableCents, currency)} libre</div>
             </div>
           </button>
         `;
@@ -2620,7 +2651,7 @@ class SmartPiggyApp {
 
     // 4. Actualizar las 4 Tarjetas KPI Patrimoniales
     document.getElementById('kpiAvailable').textContent = formatMoneyCents(childFinance.availableCents, currency);
-    document.getElementById('kpiAvailableSub').textContent = `Ingresos totales: ${formatMoneyCents(childFinance.totalIncomeCents, currency)} · Gastos: ${formatMoneyCents(childFinance.totalExpenseCents, currency)}`;
+    document.getElementById('kpiAvailableSub').textContent = `Recibido: ${formatMoneyCents(childFinance.totalIncomeCents, currency)} · Gastado: ${formatMoneyCents(childFinance.totalExpenseCents, currency)}`;
 
     document.getElementById('kpiInvested').textContent = formatMoneyCents(childFinance.investedCents, currency);
     document.getElementById('kpiInvestCountBadge').textContent = `${childFinance.activeInvestments.length} activo(s)`;
@@ -2630,8 +2661,8 @@ class SmartPiggyApp {
     document.getElementById('kpiLoanCountBadge').textContent = `${childFinance.activeLoans.length} activo(s)`;
     const nextLoan = childFinance.activeLoans.find((l) => l.nextInstallment);
     document.getElementById('kpiNextLoanDue').textContent = nextLoan
-      ? `Próxima cuota: ${formatMoneyCents(nextLoan.nextInstallment.totalInstallmentCents - (nextLoan.nextInstallment.paidCents || 0), currency)} (${nextLoan.nextInstallment.dueDate})`
-      : 'Libre de deudas pendientes';
+      ? `Siguiente pago: ${formatMoneyCents(nextLoan.nextInstallment.totalInstallmentCents - (nextLoan.nextInstallment.paidCents || 0), currency)} (${nextLoan.nextInstallment.dueDate})`
+      : 'No debes nada ahora';
 
     document.getElementById('kpiNetWorth').textContent = formatMoneyCents(childFinance.netWorthCents, currency);
     document.getElementById('kpiHistoricalYield').textContent = formatMoneyCents(childFinance.totalYieldEarnedCents, currency, true);
@@ -2663,10 +2694,10 @@ class SmartPiggyApp {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
           <span class="inline-icon-text" style="font-weight: 800; font-size: 0.95rem;">
             <span style="color: var(--color-income); display: flex;">${renderSvgIcon(child.goalIcon || 'target', 20)}</span>
-            Meta de Ahorro de ${child.name}: <span style="color: var(--color-income);">${child.goalTitle || 'Mi Gran Meta'}</span>
+            Meta de ${child.name}: <span style="color: var(--color-income);">${child.goalTitle || 'Mi Gran Meta'}</span>
           </span>
           <span style="font-family: var(--font-mono); font-weight: 800; font-size: 0.9rem;">
-            ${formatMoneyCents(currentProgressCents, currency)} / ${formatMoneyCents(targetCents, currency)} (${pct}%)
+            ${formatMoneyCents(currentProgressCents, currency)} de ${formatMoneyCents(targetCents, currency)} (${pct}%)
           </span>
         </div>
         <div class="progress-track">
@@ -2685,11 +2716,11 @@ class SmartPiggyApp {
         <div class="notice-banner danger">
           <div class="inline-icon-text">
             ${renderSvgIcon('shield-alert', 20)}
-            <span><strong>ALERTA DE SEGURIDAD CRIPTOGRÁFICA (${this.auditResult.corruptedEvents.length} asiento apócrifo bloqueado):</strong>
-            Se detectó un movimiento en almacenamiento local sin firma HMAC-SHA256 válida de Papá/Mamá. El motor lo marcó como <code>CORRUPTED_UNSIGNED_ENTRY</code> y protegió el saldo real.</span>
+            <span><strong>¡Cuidado! Se bloqueó ${this.auditResult.corruptedEvents.length} movimiento falso:</strong>
+            Alguien intentó meter datos sin el PIN de Papá/Mamá. Tu dinero real está a salvo.</span>
           </div>
           <button type="button" class="btn btn-sm btn-expense" data-action="purge-corrupted">
-            ${renderSvgIcon('trash', 15)} Eliminar Asiento Corrupto
+            ${renderSvgIcon('trash', 15)} Borrar Movimiento Falso
           </button>
         </div>
       `);
@@ -2702,11 +2733,11 @@ class SmartPiggyApp {
           <div class="notice-banner info">
             <div class="inline-icon-text">
               ${renderSvgIcon('clock', 20)}
-              <span><strong>Tienes ${due.totalDueCount} acreditación(es) programada(s) lista(s) para hoy:</strong>
-              En cuanto Mamá o Papá desbloquee el Modo Papá, tu mesada o vencimiento de inversión se firmará y sumará automáticamente a tu saldo disponible.</span>
+              <span><strong>¡Tienes ${due.totalDueCount} pago(s) listo(s) para recibir hoy!</strong>
+              Cuando Mamá o Papá ponga su PIN, tu mesada o premio de ahorro se sumará a tu alcancía.</span>
             </div>
             <button type="button" class="btn btn-sm btn-primary" data-action="open-pin">
-              ${renderSvgIcon('lock', 15)} Firmar como Papá
+              ${renderSvgIcon('lock', 15)} Pedir PIN a Papá
             </button>
           </div>
         `);
@@ -2715,10 +2746,10 @@ class SmartPiggyApp {
           <div class="notice-banner info">
             <div class="inline-icon-text">
               ${renderSvgIcon('zap', 20)}
-              <span><strong>Hay ${due.totalDueCount} evento(s) programado(s) vencido(s) hoy</strong> listos para consolidarse en el Ledger.</span>
+              <span><strong>Hay ${due.totalDueCount} pago(s) programado(s) para hoy</strong> listos para depositarse.</span>
             </div>
             <button type="button" class="btn btn-sm btn-income" data-action="consolidate-due">
-              ${renderSvgIcon('check', 15)} Firmar y Acreditar Ahora
+              ${renderSvgIcon('check', 15)} Depositar Ahora
             </button>
           </div>
         `);
@@ -2731,11 +2762,11 @@ class SmartPiggyApp {
         <div class="notice-banner warning">
           <div class="inline-icon-text">
             ${renderSvgIcon('inbox', 20)}
-            <span><strong>Tienes ${pendingReqs.length} solicitud(es) enviada(s) por tus hijos desde el Simulador Financiero:</strong>
+            <span><strong>Tienes ${pendingReqs.length} pedido(s) nuevo(s) desde la Calculadora:</strong>
             "${pendingReqs[0].title}"</span>
           </div>
           <button type="button" class="btn btn-sm btn-warn" data-switch-tab="tab-sandbox">
-            ${renderSvgIcon('check', 15)} Revisar y Aprobar en 1 Clic
+            ${renderSvgIcon('check', 15)} Ver y Aprobar Pedido
           </button>
         </div>
       `);
@@ -2756,7 +2787,7 @@ class SmartPiggyApp {
     });
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No hay movimientos registrados para este filtro.</p>`;
+      listEl.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">Aún no hay movimientos aquí.</p>`;
     } else {
       listEl.innerHTML = filtered
         .map((ev) => {
@@ -2771,22 +2802,22 @@ class SmartPiggyApp {
             signClass = 'positive';
             prefix = '+';
             fallbackIcon = 'coins';
-            typeBadge = ev.type === 'RECURRING_INCOME' ? 'Mesada Recurrente' : ev.type === 'INVESTMENT_MATURITY' ? 'Vencimiento Inversión' : 'Ingreso';
+            typeBadge = ev.type === 'RECURRING_INCOME' ? 'Mesada' : ev.type === 'INVESTMENT_MATURITY' ? 'Ahorro Ganado' : 'Dinero que entró';
           } else if (ev.type === 'EXPENSE' || ev.type === 'LOAN_PAYMENT' || ev.type === 'EXTRA_PRINCIPAL_PAYMENT') {
             signClass = 'negative';
             prefix = '-';
             fallbackIcon = 'shopping-bag';
-            typeBadge = ev.type === 'EXPENSE' ? 'Gasto' : ev.type === 'EXTRA_PRINCIPAL_PAYMENT' ? 'Abono a Capital' : 'Pago Crédito';
+            typeBadge = ev.type === 'EXPENSE' ? 'Gasto' : ev.type === 'EXTRA_PRINCIPAL_PAYMENT' ? 'Pago adelantado' : 'Pago de préstamo';
           } else if (ev.type === 'INVESTMENT_LOCK') {
             signClass = 'neutral';
             prefix = '';
             fallbackIcon = 'lock';
-            typeBadge = 'Plazo Fijo';
+            typeBadge = 'Guardado a Plazo';
           } else if (ev.type === 'REVERSAL') {
             signClass = 'neutral';
             prefix = '';
             fallbackIcon = 'undo';
-            typeBadge = 'Contra-Asiento Auditoría';
+            typeBadge = 'Movimiento Deshecho';
           }
 
           const canReverse = this.currentRole === 'PARENT' && !ev.isReversed && ev.type !== 'REVERSAL';
@@ -2799,13 +2830,12 @@ class SmartPiggyApp {
                 <div>
                   <p class="tx-title">
                     ${ev.note || cat?.name || typeBadge}
-                    ${ev.isReversed ? `<span class="badge badge-danger">${renderSvgIcon('ban', 12)} ANULADO POR REVERSO</span>` : ''}
+                    ${ev.isReversed ? `<span class="badge badge-danger">${renderSvgIcon('ban', 12)} CANCELADO</span>` : ''}
                   </p>
                   <p class="tx-sub inline-icon-text" style="flex-wrap: wrap;">
                     ${renderSvgIcon('calendar', 13)} <span>${ev.localDate}</span> ·
                     <span class="badge badge-info">${cat?.name || typeBadge}</span> ·
-                    <span>Firmado por ${parentAuthor ? parentAuthor.name : 'Papá/Mamá'}</span> ·
-                    <span>Hash: <code>${(ev.eventHash || '').slice(0, 8)}…</code></span>
+                    <span>Autorizó: ${parentAuthor ? parentAuthor.name : 'Papá/Mamá'}</span>
                   </p>
                 </div>
               </div>
@@ -2815,13 +2845,13 @@ class SmartPiggyApp {
                     ${prefix}${formatMoneyCents(ev.amountCents, currency)}
                   </div>
                   <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
-                    Saldo disp: ${formatMoneyCents(ev.runningAvailableCents, currency)}
+                    Quedó: ${formatMoneyCents(ev.runningAvailableCents, currency)}
                   </div>
                 </div>
                 ${
                   canReverse
-                    ? `<button type="button" class="btn btn-ghost btn-sm parent-only" data-reverse-tx="${ev.id}" title="Crear contra-asiento contable (REVERSAL) para anular este movimiento">
-                        ${renderSvgIcon('undo', 14)} Revertir
+                    ? `<button type="button" class="btn btn-ghost btn-sm parent-only" data-reverse-tx="${ev.id}" title="Cancelar este movimiento y devolver el saldo a como estaba">
+                        ${renderSvgIcon('undo', 14)} Deshacer
                       </button>`
                     : ''
                 }
@@ -2836,7 +2866,7 @@ class SmartPiggyApp {
     const incContainer = document.getElementById('incomeSourcesChartContainer');
     const incEntries = Object.entries(childFinance.incomeBySource);
     if (incEntries.length === 0) {
-      incContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.84rem;">Sin ingresos registrados aún.</p>`;
+      incContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.84rem;">Aún no has recibido dinero.</p>`;
     } else {
       incContainer.innerHTML = incEntries
         .sort((a, b) => b[1] - a[1])
@@ -2866,7 +2896,7 @@ class SmartPiggyApp {
     const expEntries = Object.entries(childFinance.expenseByCategory);
     const totalOutflow = expEntries.reduce((s, [, v]) => s + v, 0);
     if (expEntries.length === 0) {
-      expContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.84rem;">Sin gastos descontados aún.</p>`;
+      expContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.84rem;">Aún no has gastado dinero.</p>`;
     } else {
       expContainer.innerHTML = expEntries
         .sort((a, b) => b[1] - a[1])
@@ -2896,14 +2926,14 @@ class SmartPiggyApp {
     const container = document.getElementById('recurringRulesContainer');
     const rules = (this.state.recurringRules || []).filter((r) => r.memberId === child.id);
     const freqLabels = {
-      DAILY: 'Diario',
-      WEEKLY: 'Semanal (Cada 7 días)',
-      BIWEEKLY: 'Quincenal (Cada 14 días)',
-      MONTHLY: 'Mensual'
+      DAILY: 'Cada día',
+      WEEKLY: 'Cada semana (7 días)',
+      BIWEEKLY: 'Cada 2 semanas (14 días)',
+      MONTHLY: 'Cada mes'
     };
 
     if (rules.length === 0) {
-      container.innerHTML = `<p style="color: var(--text-muted);">No hay ingresos recurrentes programados para ${child.name}.</p>`;
+      container.innerHTML = `<p style="color: var(--text-muted);">No hay mesadas programadas para ${child.name}.</p>`;
       return;
     }
 
@@ -2915,7 +2945,7 @@ class SmartPiggyApp {
           <div class="panel-card" style="margin-bottom: 0; background: var(--bg-elevated);">
             <div class="panel-header" style="margin-bottom: 0.6rem;">
               <span class="badge ${rule.status === 'ACTIVE' ? 'badge-success' : 'badge-warn'}">
-                ${rule.status === 'ACTIVE' ? `${renderSvgIcon('check', 13)} Programación Activa` : `${renderSvgIcon('pause', 13)} Pausado`}
+                ${rule.status === 'ACTIVE' ? `${renderSvgIcon('check', 13)} Activa` : `${renderSvgIcon('pause', 13)} En Pausa`}
               </span>
               <span class="badge badge-info">${freqLabels[rule.frequency] || rule.frequency}</span>
             </div>
@@ -2927,22 +2957,22 @@ class SmartPiggyApp {
               +${formatMoneyCents(rule.amountCents, currency)}
             </div>
             <div style="font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 0.75rem 0; display: flex; flex-direction: column; gap: 0.3rem;">
-              <span class="inline-icon-text">${renderSvgIcon('calendar', 14)} <strong>Próxima fecha:</strong> ${rule.nextExecutionDate}</span>
-              <span class="inline-icon-text">${renderSvgIcon('arrow-down-left', 14)} <strong>Fuente:</strong> ${cat?.name || 'Mesada'}</span>
+              <span class="inline-icon-text">${renderSvgIcon('calendar', 14)} <strong>Siguiente pago:</strong> ${rule.nextExecutionDate}</span>
+              <span class="inline-icon-text">${renderSvgIcon('arrow-down-left', 14)} <strong>De dónde viene:</strong> ${cat?.name || 'Mesada'}</span>
               <span class="inline-icon-text">
                 ${
                   linkedLoan
-                    ? `${renderSvgIcon('credit-card', 14)} <strong>Retención automática:</strong> Abona cuota a "${linkedLoan.concept}"`
-                    : `${renderSvgIcon('unlock', 14)} <strong>Sin retención:</strong> 100% libre a la alcancía`
+                    ? `${renderSvgIcon('credit-card', 14)} <strong>Pago automático:</strong> Se aparta el pago de "${linkedLoan.concept}"`
+                    : `${renderSvgIcon('unlock', 14)} <strong>100% libre:</strong> Todo entra directo a tu alcancía`
                 }
               </span>
             </div>
             <div class="parent-only" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
               <button type="button" class="btn btn-income btn-sm" data-trigger-recurring="${rule.id}">
-                ${renderSvgIcon('zap', 14)} Acreditar Periodo Ahora
+                ${renderSvgIcon('zap', 14)} Depositar Mesada Hoy
               </button>
               <button type="button" class="btn btn-ghost btn-sm" data-toggle-recurring="${rule.id}">
-                ${rule.status === 'ACTIVE' ? `${renderSvgIcon('pause', 14)} Pausar` : `${renderSvgIcon('play', 14)} Reactivar`}
+                ${rule.status === 'ACTIVE' ? `${renderSvgIcon('pause', 14)} Pausar` : `${renderSvgIcon('play', 14)} Volver a Activar`}
               </button>
             </div>
           </div>
@@ -2956,28 +2986,28 @@ class SmartPiggyApp {
     const loans = childFinance.loans;
 
     if (loans.length === 0) {
-      container.innerHTML = `<p style="color: var(--text-muted);">No hay créditos registrados para esta alcancía.</p>`;
+      container.innerHTML = `<p style="color: var(--text-muted);">¡Súper! No tienes ningún préstamo por pagar.</p>`;
       return;
     }
 
     container.innerHTML = loans
       .map((loan) => {
-        const typeLabel = loan.interestType === 'COMPOUND_FRENCH' ? 'Interés Compuesto (Francés)' : 'Interés Simple';
+        const typeLabel = loan.interestType === 'COMPOUND_FRENCH' ? 'Interés Compuesto (Pagos Fijos)' : 'Interés Simple';
         const statusBadge =
           loan.status === 'PAID_OFF'
-            ? `<span class="badge badge-success">${renderSvgIcon('check', 13)} Liquidado</span>`
+            ? `<span class="badge badge-success">${renderSvgIcon('check', 13)} ¡Todo Pagado!</span>`
             : loan.hasOverdue
-              ? `<span class="badge badge-danger">${renderSvgIcon('alert-triangle', 13)} Con Cuota en Mora</span>`
-              : `<span class="badge badge-purple">${renderSvgIcon('credit-card', 13)} Crédito Activo</span>`;
+              ? `<span class="badge badge-danger">${renderSvgIcon('alert-triangle', 13)} Pago Atrasado</span>`
+              : `<span class="badge badge-purple">${renderSvgIcon('credit-card', 13)} Pagando</span>`;
 
         const rowsHtml = (loan.schedule || [])
           .map((inst) => {
             const stBadge =
               inst.status === 'PAID'
-                ? `<span class="badge badge-success">${inst.isExtraPrincipalPayment ? `${renderSvgIcon('zap', 12)} Abono Capital` : `${renderSvgIcon('check', 12)} Pagada`}</span>`
+                ? `<span class="badge badge-success">${inst.isExtraPrincipalPayment ? `${renderSvgIcon('zap', 12)} Pago Adelantado` : `${renderSvgIcon('check', 12)} Pagado`}</span>`
                 : inst.status === 'OVERDUE'
-                  ? `<span class="badge badge-danger">${renderSvgIcon('alert-triangle', 12)} En Mora (Parcial)</span>`
-                  : `<span class="badge badge-warn">${renderSvgIcon('clock', 12)} Pendiente</span>`;
+                  ? `<span class="badge badge-danger">${renderSvgIcon('alert-triangle', 12)} Falta Completar</span>`
+                  : `<span class="badge badge-warn">${renderSvgIcon('clock', 12)} Por Pagar</span>`;
 
             const pendingInstCents = Math.max(0, inst.totalInstallmentCents - (inst.paidCents || 0));
             return `
@@ -2993,11 +3023,11 @@ class SmartPiggyApp {
                   ${
                     inst.status !== 'PAID' && loan.status === 'ACTIVE'
                       ? `
-                        <button type="button" class="btn btn-loan btn-sm" data-pay-installment="${loan.id}:${inst.installmentNumber}:PIGGY" title="Descontar ${formatMoneyCents(pendingInstCents, currency)} del saldo disponible de la alcancía">
-                          ${renderSvgIcon('piggy', 14)} Cobrar de Alcancía
+                        <button type="button" class="btn btn-loan btn-sm" data-pay-installment="${loan.id}:${inst.installmentNumber}:PIGGY" title="Descontar ${formatMoneyCents(pendingInstCents, currency)} del dinero de la alcancía">
+                          ${renderSvgIcon('piggy', 14)} Pagar con Alcancía
                         </button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-pay-installment="${loan.id}:${inst.installmentNumber}:EXTERNAL" title="Registrar pago con efectivo externo o tareas sin restar de la alcancía">
-                          ${renderSvgIcon('dollar', 14)} Pago Externo
+                        <button type="button" class="btn btn-ghost btn-sm" data-pay-installment="${loan.id}:${inst.installmentNumber}:EXTERNAL" title="Anotar como pagado con efectivo o tareas en casa">
+                          ${renderSvgIcon('dollar', 14)} Pagó en Efectivo
                         </button>
                       `
                       : '—'
@@ -3015,15 +3045,15 @@ class SmartPiggyApp {
                 <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;">
                   <h3 style="margin: 0; font-size: 1.1rem;">${loan.concept}</h3>
                   ${statusBadge}
-                  <span class="badge badge-info">${typeLabel} · ${loan.interestRatePercent}% por periodo</span>
+                  <span class="badge badge-info">${typeLabel} · ${loan.interestRatePercent}% extra</span>
                 </div>
                 <p style="margin: 0.3rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">
-                  Capital Prestado: <strong>${formatMoneyCents(loan.principalCents, currency)}</strong> ·
-                  Intereses Totales: <strong style="color: var(--color-expense);">${formatMoneyCents(loan.totalInterestCents, currency)}</strong> ·
-                  Saldo Insoluto por Pagar: <strong style="color: var(--color-loan);">${formatMoneyCents(loan.remainingDebtCents, currency)}</strong>
+                  Dinero Prestado: <strong>${formatMoneyCents(loan.principalCents, currency)}</strong> ·
+                  Costo de Intereses: <strong style="color: var(--color-expense);">${formatMoneyCents(loan.totalInterestCents, currency)}</strong> ·
+                  Falta por Pagar: <strong style="color: var(--color-loan);">${formatMoneyCents(loan.remainingDebtCents, currency)}</strong>
                   ${
                     loan.interestSavedByExtraPaymentsCents > 0
-                      ? ` · <strong style="color: var(--color-income);">Intereses ahorrados por abonos a capital: ${formatMoneyCents(loan.interestSavedByExtraPaymentsCents, currency)}</strong>`
+                      ? ` · <strong style="color: var(--color-income);">¡Te ahorraste ${formatMoneyCents(loan.interestSavedByExtraPaymentsCents, currency)} por adelantar pagos!</strong>`
                       : ''
                   }
                 </p>
@@ -3032,7 +3062,7 @@ class SmartPiggyApp {
                 ${
                   loan.status === 'ACTIVE' && loan.remainingDebtCents > 0
                     ? `<button type="button" class="btn btn-primary btn-sm" data-open-extra-principal="${loan.id}">
-                        ${renderSvgIcon('zap', 14)} Abono Extraordinario a Capital
+                        ${renderSvgIcon('zap', 14)} Adelantar Pago (Ahorrar Intereses)
                       </button>`
                     : ''
                 }
@@ -3047,14 +3077,14 @@ class SmartPiggyApp {
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Cuota</th>
-                    <th>Vencimiento</th>
-                    <th>Abono Capital</th>
+                    <th>Pago #</th>
+                    <th>Fecha</th>
+                    <th>Del Préstamo</th>
                     <th>Interés</th>
-                    <th>Cuota Total</th>
-                    <th>Pagado</th>
+                    <th>Total del Pago</th>
+                    <th>Ya Pagado</th>
                     <th>Estado</th>
-                    <th class="parent-only">Acción Parental</th>
+                    <th class="parent-only">Pagar (Papá/Mamá)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3073,7 +3103,7 @@ class SmartPiggyApp {
     const investments = childFinance.investments;
 
     if (investments.length === 0) {
-      container.innerHTML = `<p style="color: var(--text-muted);">No hay inversiones a plazo fijo registradas para esta alcancía.</p>`;
+      container.innerHTML = `<p style="color: var(--text-muted);">Aún no tienes ahorros guardados a plazo.</p>`;
       return;
     }
 
@@ -3081,16 +3111,16 @@ class SmartPiggyApp {
       .map((inv) => {
         const stBadge =
           inv.status === 'MATURED'
-            ? `<span class="badge badge-success">${renderSvgIcon('check', 13)} Vencida y Acreditada</span>`
+            ? `<span class="badge badge-success">${renderSvgIcon('check', 13)} ¡Terminado y Cobrado!</span>`
             : inv.status === 'CANCELLED_EARLY'
-              ? `<span class="badge badge-warn">${renderSvgIcon('stop', 13)} Rescate Anticipado (Sin interés)</span>`
-              : `<span class="badge badge-info">${renderSvgIcon('lock', 13)} En Plazo Activo (${inv.progressPercent}%)</span>`;
+              ? `<span class="badge badge-warn">${renderSvgIcon('stop', 13)} Sacado Antes (Sin premio)</span>`
+              : `<span class="badge badge-info">${renderSvgIcon('lock', 13)} Creciendo (${inv.progressPercent}%)</span>`;
 
         return `
           <div class="panel-card" style="margin-bottom: 0; background: var(--bg-elevated);">
             <div class="panel-header" style="margin-bottom: 0.5rem;">
               ${stBadge}
-              <span class="badge badge-success">+${inv.yieldRatePercent}% garantizado (${inv.termDays} días)</span>
+              <span class="badge badge-success">Ganas +${inv.yieldRatePercent}% en ${inv.termDays} días</span>
             </div>
             <h3 class="inline-icon-text" style="margin: 0 0 0.4rem 0; font-size: 1.06rem;">
               ${renderSvgIcon('trending-up', 19)}
@@ -3099,15 +3129,15 @@ class SmartPiggyApp {
 
             <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
               <div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Capital Invertido</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Dinero Guardado</div>
                 <div style="font-family: var(--font-mono); font-size: 1.35rem; font-weight: 800;">${formatMoneyCents(inv.principalCents, currency)}</div>
               </div>
               <div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Devengado Hoy</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Ganado hasta hoy</div>
                 <div style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--color-income);">+${formatMoneyCents(inv.accruedInterestTodayCents, currency)}</div>
               </div>
               <div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Total al Vencer</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Recibirás al final</div>
                 <div style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 800; color: var(--color-invest);">${formatMoneyCents(inv.maturityTotalCents, currency)}</div>
               </div>
             </div>
@@ -3118,18 +3148,18 @@ class SmartPiggyApp {
 
             <p class="inline-icon-text" style="font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 0.85rem 0; flex-wrap: wrap;">
               ${renderSvgIcon('calendar', 14)}
-              <span>Inicio: <strong>${inv.startDate}</strong> · Vencimiento: <strong>${inv.maturityDate}</strong> (${inv.status === 'ACTIVE' ? `Faltan ${inv.remainingDays} días` : 'Plazo concluido'})</span>
+              <span>Empezó: <strong>${inv.startDate}</strong> · Termina: <strong>${inv.maturityDate}</strong> (${inv.status === 'ACTIVE' ? `Faltan ${inv.remainingDays} días` : 'Listo'})</span>
             </p>
 
             ${
               inv.status === 'ACTIVE'
                 ? `
                   <div class="parent-only" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-income btn-sm" data-mature-investment="${inv.id}" title="Liquidar inversión pagando capital + rendimiento completo a la alcancía">
-                      ${renderSvgIcon('check', 14)} Liquidar con Rendimiento (+${formatMoneyCents(inv.expectedInterestCents, currency)})
+                    <button type="button" class="btn btn-income btn-sm" data-mature-investment="${inv.id}" title="Entregar el dinero guardado más su ganancia completa a la alcancía">
+                      ${renderSvgIcon('check', 14)} Entregar Dinero + Ganancia (+${formatMoneyCents(inv.expectedInterestCents, currency)})
                     </button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-early-exit-investment="${inv.id}" title="Retirar antes de plazo devolviendo solo el capital sin intereses">
-                      ${renderSvgIcon('stop', 14)} Rescate Anticipado (0% interés)
+                    <button type="button" class="btn btn-ghost btn-sm" data-early-exit-investment="${inv.id}" title="Sacar el dinero antes de tiempo sin ganancia extra">
+                      ${renderSvgIcon('stop', 14)} Sacar Antes (Sin Ganancia)
                     </button>
                   </div>
                 `
@@ -3156,7 +3186,7 @@ class SmartPiggyApp {
                 <div>
                   <h4 style="margin: 0; font-size: 1rem;">${m.name}</h4>
                   <span class="badge ${isParent ? 'badge-purple' : 'badge-info'}">
-                    ${isParent ? `${renderSvgIcon('lock', 12)} Nivel PAPÁ/MAMÁ (Lectura y Escritura)` : `${renderSvgIcon('eye', 12)} Nivel HIJO/A (Solo Lectura · ${m.age || 10} años)`}
+                    ${isParent ? `${renderSvgIcon('lock', 12)} Papá / Mamá (Con PIN)` : `${renderSvgIcon('eye', 12)} Hijo/a (${m.age || 10} años)`}
                   </span>
                 </div>
               </div>
@@ -3170,11 +3200,11 @@ class SmartPiggyApp {
               !isParent
                 ? `<p class="inline-icon-text" style="margin: 0.65rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
                     ${renderSvgIcon(m.goalIcon || 'target', 15)}
-                    <span>Meta configurada: <strong>${m.goalTitle || 'Ahorro General'}</strong> (${formatMoneyCents(m.goalTargetCents || 100000, currency)})</span>
+                    <span>Su meta: <strong>${m.goalTitle || 'Ahorro General'}</strong> (${formatMoneyCents(m.goalTargetCents || 100000, currency)})</span>
                   </p>`
                 : `<p class="inline-icon-text" style="margin: 0.65rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">
                     ${renderSvgIcon('shield-check', 15)}
-                    <span>Autorizado para firmar asientos contables en el Libro Mayor con PIN Parental.</span>
+                    <span>Puede autorizar movimientos y préstamos con su PIN.</span>
                   </p>`
             }
           </div>
@@ -3191,10 +3221,10 @@ class SmartPiggyApp {
             <div class="tx-icon" style="color: ${c.color || 'var(--color-income)'};">${renderSvgIcon(c.icon || 'coins', 20)}</div>
             <div>
               <p class="tx-title">${c.name}</p>
-              <p class="tx-sub">${c.description || 'Fuente de ingreso familiar'}</p>
+              <p class="tx-sub">${c.description || 'De dónde llega el dinero'}</p>
             </div>
           </div>
-          <span class="badge badge-success">Fuente de Ingreso</span>
+          <span class="badge badge-success">Entrada de Dinero</span>
         </div>
       `
       )
@@ -3209,10 +3239,10 @@ class SmartPiggyApp {
             <div class="tx-icon" style="color: ${c.color || 'var(--color-expense)'};">${renderSvgIcon(c.icon || 'shopping-bag', 20)}</div>
             <div>
               <p class="tx-title">${c.name}</p>
-              <p class="tx-sub">${c.description || 'Categoría de gasto'}</p>
+              <p class="tx-sub">${c.description || 'Tipo de gasto'}</p>
             </div>
           </div>
-          <span class="badge badge-danger">Categoría de Gasto</span>
+          <span class="badge badge-danger">Tipo de Gasto</span>
         </div>
       `
       )
@@ -3224,7 +3254,7 @@ class SmartPiggyApp {
     const reqs = (this.state.childRequests || []).slice().reverse();
 
     if (reqs.length === 0) {
-      container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.86rem;">Aún no hay solicitudes enviadas desde el Simulador.</p>`;
+      container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.86rem;">Aún no has enviado pedidos desde la Calculadora.</p>`;
       return;
     }
 
@@ -3233,17 +3263,17 @@ class SmartPiggyApp {
         const child = this.getChildren().find((c) => c.id === r.memberId) || { name: 'Hijo/a', avatar: 'piggy' };
         const stBadge =
           r.status === 'APPROVED'
-            ? `<span class="badge badge-success">${renderSvgIcon('check', 13)} Aprobada y Firmada por Papá</span>`
+            ? `<span class="badge badge-success">${renderSvgIcon('check', 13)} ¡Aceptado por Papá/Mamá!</span>`
             : r.status === 'REJECTED'
-              ? `<span class="badge badge-danger">${renderSvgIcon('x', 13)} Rechazada</span>`
-              : `<span class="badge badge-warn">${renderSvgIcon('clock', 13)} Pendiente de Revisión Parental</span>`;
+              ? `<span class="badge badge-danger">${renderSvgIcon('x', 13)} No aprobado</span>`
+              : `<span class="badge badge-warn">${renderSvgIcon('clock', 13)} Esperando a Papá/Mamá</span>`;
 
         return `
           <div class="tx-item" style="margin-bottom: 0.55rem;">
             <div class="tx-left">
               <div class="tx-icon" style="color: var(--color-invest);">${renderSvgIcon(child.avatar || 'piggy', 20)}</div>
               <div>
-                <p class="tx-title">${child.name} solicita: ${r.title}</p>
+                <p class="tx-title">${child.name} pide: ${r.title}</p>
                 <p class="tx-sub">${r.note || ''}</p>
               </div>
             </div>
@@ -3253,10 +3283,10 @@ class SmartPiggyApp {
                 r.status === 'PENDING' && this.currentRole === 'PARENT'
                   ? `
                     <button type="button" class="btn btn-income btn-sm parent-only" data-approve-request="${r.id}">
-                      ${renderSvgIcon('check', 14)} Aprobar y Ejecutar
+                      ${renderSvgIcon('check', 14)} Aceptar Pedido
                     </button>
                     <button type="button" class="btn btn-ghost btn-sm parent-only" data-reject-request="${r.id}">
-                      ${renderSvgIcon('x', 14)} Rechazar
+                      ${renderSvgIcon('x', 14)} No por ahora
                     </button>
                   `
                   : ''
@@ -3275,10 +3305,10 @@ class SmartPiggyApp {
 
     if (this.auditResult.isClean) {
       badge.className = 'badge badge-success';
-      badge.innerHTML = `${renderSvgIcon('shield-check', 13)} ${this.auditResult.validEvents.length} Asientos Verificados`;
+      badge.innerHTML = `${renderSvgIcon('shield-check', 13)} ${this.auditResult.validEvents.length} Movimientos Seguros`;
     } else {
       badge.className = 'badge badge-danger';
-      badge.innerHTML = `${renderSvgIcon('shield-alert', 13)} ${this.auditResult.corruptedEvents.length} Asiento Corrupto Rechazado`;
+      badge.innerHTML = `${renderSvgIcon('shield-alert', 13)} ${this.auditResult.corruptedEvents.length} Movimiento Falso Bloqueado`;
     }
 
     const lastEv = this.auditResult.validEvents[this.auditResult.validEvents.length - 1];
@@ -3286,20 +3316,20 @@ class SmartPiggyApp {
     box.innerHTML = `
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
         <div>
-          <strong>Algoritmo de Derivación:</strong><br/>
-          <code>PBKDF2-SHA256 (210,000 iter)</code>
+          <strong>Protección del PIN:</strong><br/>
+          <code>PBKDF2-SHA256 (210,000 rondas)</code>
         </div>
         <div>
-          <strong>Firma del Libro Mayor:</strong><br/>
+          <strong>Candado de Movimientos:</strong><br/>
           <code>HMAC-SHA256 + Cadena SHA-256</code>
         </div>
         <div>
-          <strong>Asientos Válidos / Rechazados:</strong><br/>
-          <span style="color: var(--color-income); font-weight: 700;">${this.auditResult.validEvents.length} válidos</span> /
-          <span style="color: var(--color-expense); font-weight: 700;">${this.auditResult.corruptedEvents.length} apócrifos</span>
+          <strong>Movimientos Reales / Falsos:</strong><br/>
+          <span style="color: var(--color-income); font-weight: 700;">${this.auditResult.validEvents.length} reales</span> /
+          <span style="color: var(--color-expense); font-weight: 700;">${this.auditResult.corruptedEvents.length} bloqueados</span>
         </div>
         <div>
-          <strong>Último Hash Verificado:</strong><br/>
+          <strong>Último Sello de Seguridad:</strong><br/>
           <code>${lastEv ? lastEv.eventHash.slice(0, 20) + '…' : 'GENESIS'}</code>
         </div>
       </div>
@@ -3307,7 +3337,7 @@ class SmartPiggyApp {
         this.auditResult.corruptedEvents.length > 0
           ? `<div class="inline-icon-text" style="margin-top: 0.75rem; padding: 0.65rem; background: var(--color-expense-bg); border-radius: 8px; color: var(--color-expense);">
               ${renderSvgIcon('shield-alert', 18)}
-              <span><strong>Detalle de bloqueo:</strong> El asiento <code>${this.auditResult.corruptedEvents[0].id}</code> por ${formatMoneyCents(this.auditResult.corruptedEvents[0].amountCents, currency)} fue ignorado en el cálculo de saldos: <em>${this.auditResult.corruptedEvents[0].corruptionReason}</em></span>
+              <span><strong>Movimiento bloqueado:</strong> Alguien intentó anotar ${formatMoneyCents(this.auditResult.corruptedEvents[0].amountCents, currency)} sin el PIN de Papá/Mamá y el escudo lo detuvo.</span>
             </div>`
           : ''
       }
@@ -3456,17 +3486,30 @@ class SmartPiggyApp {
     }
   }
 
-  openTransactionDialog(mode = 'INCOME') {
-    if (!this.ensureParentPermission()) return;
+  setTransactionModalMode(mode = 'INCOME') {
     this.populateChildAndCatalogSelectors(mode);
     document.getElementById('txFormMode').value = mode;
     document.getElementById('dialogTxTitle').innerHTML =
       mode === 'INCOME'
-        ? `${renderSvgIcon('plus', 19)} Registrar Ingreso en Alcancía`
-        : `${renderSvgIcon('minus', 19)} Descontar Gasto de Alcancía`;
+        ? `${renderSvgIcon('plus', 19)} Meter Dinero en la Alcancía`
+        : `${renderSvgIcon('minus', 19)} Anotar un Gasto de la Alcancía`;
     document.getElementById('txCatalogLabel').textContent =
-      mode === 'INCOME' ? 'Fuente de Ingreso' : 'Categoría de Gasto';
+      mode === 'INCOME' ? '¿De dónde viene el dinero?' : '¿En qué se gastó?';
     document.getElementById('txOverdraftModeGroup').style.display = mode === 'EXPENSE' ? 'flex' : 'none';
+
+    const btnInc = document.getElementById('btnSwitchModeIncome');
+    const btnExp = document.getElementById('btnSwitchModeExpense');
+    if (btnInc && btnExp) {
+      btnInc.classList.toggle('active-income', mode === 'INCOME');
+      btnInc.classList.remove('active-expense');
+      btnExp.classList.toggle('active-expense', mode === 'EXPENSE');
+      btnExp.classList.remove('active-income');
+    }
+  }
+
+  openTransactionDialog(mode = 'INCOME') {
+    if (!this.ensureParentPermission()) return;
+    this.setTransactionModalMode(mode);
     document.getElementById('txDateInput').value = getTodayLocalDate();
     document.getElementById('txAmountInput').value = '';
     document.getElementById('txNoteInput').value = '';
@@ -3564,6 +3607,25 @@ class SmartPiggyApp {
     document.getElementById('btnQuickInvest')?.addEventListener('click', () => this.openInvestmentDialog());
     document.getElementById('btnQuickLoan')?.addEventListener('click', () => this.openLoanDialog());
 
+    // Botón flotante fijo (+ Añadir Movimiento) accesible desde cualquier ventana
+    document.getElementById('fabAddMovement')?.addEventListener('click', () => {
+      if (this.currentRole === 'PARENT' && this.parentSigningKey) {
+        this.openTransactionDialog('INCOME');
+      } else {
+        this.pendingAfterPinAction = () => this.openTransactionDialog('INCOME');
+        this.showToast('Pide a Papá o Mamá que ponga su PIN para añadir el movimiento.', 'info');
+        this.openParentPinDialog();
+      }
+    });
+
+    // Selector rápido dentro del modal (+ Meter Dinero / - Gasté Dinero)
+    document.getElementById('btnSwitchModeIncome')?.addEventListener('click', () => {
+      this.setTransactionModalMode('INCOME');
+    });
+    document.getElementById('btnSwitchModeExpense')?.addEventListener('click', () => {
+      this.setTransactionModalMode('EXPENSE');
+    });
+
     document.getElementById('btnOpenRecurringModal')?.addEventListener('click', () => this.openRecurringDialog());
     document.getElementById('btnOpenLoanModal')?.addEventListener('click', () => this.openLoanDialog());
     document.getElementById('btnOpenInvestmentModal')?.addEventListener('click', () => this.openInvestmentDialog());
@@ -3575,14 +3637,14 @@ class SmartPiggyApp {
     document.getElementById('btnAddIncomeSource')?.addEventListener('click', () => {
       if (!this.ensureParentPermission()) return;
       document.getElementById('catTypeInput').value = 'INCOME_SOURCE';
-      document.getElementById('dialogCatalogTitle').innerHTML = `${renderSvgIcon('arrow-down-left', 19)} Definir Nueva Fuente de Ingreso`;
+      document.getElementById('dialogCatalogTitle').innerHTML = `${renderSvgIcon('arrow-down-left', 19)} Agregar Entrada de Dinero`;
       document.getElementById('dialogCatalog')?.showModal();
     });
 
     document.getElementById('btnAddExpenseCategory')?.addEventListener('click', () => {
       if (!this.ensureParentPermission()) return;
       document.getElementById('catTypeInput').value = 'EXPENSE_CATEGORY';
-      document.getElementById('dialogCatalogTitle').innerHTML = `${renderSvgIcon('arrow-up-right', 19)} Definir Nueva Categoría de Gasto`;
+      document.getElementById('dialogCatalogTitle').innerHTML = `${renderSvgIcon('arrow-up-right', 19)} Agregar Tipo de Gasto`;
       document.getElementById('dialogCatalog')?.showModal();
     });
 
@@ -3732,6 +3794,9 @@ class SmartPiggyApp {
 
     document.getElementById('btnCopySupabaseSql')?.addEventListener('click', () => this.copySupabaseSqlToClipboard());
     document.getElementById('btnCopyChildShareLink')?.addEventListener('click', () => this.copyChildReadOnlyShareLink());
+    document.getElementById('btnShareSupabaseMessage')?.addEventListener('click', () => this.shareSupabaseConnectionMessage());
+    document.getElementById('btnShareWhatsAppDirect')?.addEventListener('click', () => this.shareSupabaseViaWhatsApp());
+    document.getElementById('btnApplyPastedConnection')?.addEventListener('click', () => this.applyPastedConnectionCode());
     document.getElementById('btnExportCloudJson')?.addEventListener('click', () => this.exportSignedSnapshotJson());
     document.getElementById('inputImportCloudJson')?.addEventListener('change', (e) => this.importSignedSnapshotJson(e));
     document.getElementById('btnUpdateParentPin')?.addEventListener('click', () => this.updateParentPinAndResign());
@@ -4635,35 +4700,180 @@ class SmartPiggyApp {
     this.renderAll();
   }
 
-  async copyChildReadOnlyShareLink() {
-    const url = new URL(window.location.href);
-    url.searchParams.set('family', this.state.family.familyCode);
-    url.searchParams.set('role', 'child');
+  buildShareConnectionPayload() {
+    const cfg = this.cloudManager.cloudConfig || {};
+    const familyCode = this.state?.family?.familyCode || 'FAM-2026-KIDS';
+    const endpointUrl = (document.getElementById('cloudEndpointInput')?.value || cfg.endpointUrl || '').trim();
+    const apiKey = (document.getElementById('cloudApiKeyInput')?.value || cfg.apiKey || '').trim();
+    const provider = document.getElementById('cloudProviderSelect')?.value || cfg.provider || 'SUPABASE_REST';
+    const tableName = (document.getElementById('cloudTableNameInput')?.value || cfg.tableName || 'smartpiggy_families').trim();
 
-    // Si hay credenciales de Supabase configuradas, empaquetarlas en el enlace para que el dispositivo del hijo
-    // se conecte automáticamente en tiempo real al abrir la URL de GitHub Pages
-    const cfg = this.cloudManager.cloudConfig;
-    if (cfg && cfg.endpointUrl && cfg.apiKey) {
+    const rawObj = {
+      f: familyCode,
+      p: provider,
+      u: endpointUrl,
+      k: apiKey,
+      t: tableName
+    };
+
+    const base64Token = btoa(JSON.stringify(rawObj));
+    const connectionCode = `SPIGGY-${base64Token}`;
+
+    const shareUrl = new URL(
+      window.location.protocol.startsWith('http')
+        ? window.location.origin + window.location.pathname
+        : 'https://alfonsotensa-pixel.github.io/alcancia-digital-familiar/'
+    );
+    shareUrl.searchParams.set('family', familyCode);
+    if (endpointUrl && apiKey) {
+      shareUrl.searchParams.set('sb', base64Token);
+    }
+
+    const messageText = [
+      `Alcancía Digital Familiar (${this.state?.family?.name || 'SmartPiggy'})`,
+      `Código de Familia: ${familyCode}`,
+      ``,
+      `1) Toca este enlace para entrar ya conectado en tiempo real:`,
+      shareUrl.toString(),
+      ``,
+      `2) O si ya abriste la app, pega este código en "Conectar y Sincronizar":`,
+      connectionCode
+    ].join('\n');
+
+    return {
+      hasCredentials: Boolean(endpointUrl && apiKey),
+      shareUrl: shareUrl.toString(),
+      connectionCode,
+      messageText
+    };
+  }
+
+  async shareSupabaseConnectionMessage() {
+    await this.saveAndSyncCloudSettings();
+    const payload = this.buildShareConnectionPayload();
+    if (!payload.hasCredentials) {
+      this.showToast('Se preparó el mensaje con tu Código Familiar (agrega tu URL y Anon Key de Supabase si quieres incluir las llaves en el mensaje).', 'info');
+    }
+
+    if (navigator.share) {
       try {
-        const encoded = btoa(
-          JSON.stringify({
-            p: cfg.provider || 'SUPABASE_REST',
-            u: cfg.endpointUrl,
-            k: cfg.apiKey,
-            t: cfg.tableName || 'smartpiggy_families'
-          })
-        );
-        url.searchParams.set('sb', encoded);
+        await navigator.share({
+          title: 'Conectar Alcancía Digital Familiar',
+          text: payload.messageText,
+          url: payload.shareUrl
+        });
+        this.showToast('Mensaje de conexión compartido con éxito.', 'success');
+        return;
       } catch {
-        // ignore
+        // Si el usuario cierra la hoja nativa o falla, cae al portapapeles
       }
     }
 
     try {
-      await navigator.clipboard.writeText(url.toString());
-      this.showToast('Enlace de Solo-Lectura con auto-conexión en tiempo real copiado al portapapeles.', 'info');
+      await navigator.clipboard.writeText(payload.messageText);
+      this.showToast('¡Mensaje con enlace y llaves de conexión copiado! Pégalo en el chat familiar.', 'success');
     } catch {
-      this.showToast(`Enlace para Hijos: ${url.toString()}`, 'info');
+      const pasteInput = document.getElementById('inputPasteConnectionCode');
+      if (pasteInput) {
+        pasteInput.value = payload.connectionCode;
+        pasteInput.select();
+      }
+      this.showToast('Copia el código SPIGGY mostrado en el cuadro para enviarlo a tu familia.', 'info');
+    }
+  }
+
+  async shareSupabaseViaWhatsApp() {
+    await this.saveAndSyncCloudSettings();
+    const payload = this.buildShareConnectionPayload();
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(payload.messageText)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    this.showToast('Abriendo WhatsApp con el mensaje de conexión listo para enviar.', 'success');
+  }
+
+  async applyPastedConnectionCode() {
+    const inputEl = document.getElementById('inputPasteConnectionCode');
+    const rawText = (inputEl?.value || '').trim();
+    if (!rawText) {
+      this.showToast('Primero pega aquí el mensaje o enlace que te mandaron.', 'warn');
+      return;
+    }
+
+    let base64Candidate = null;
+    let extractedFamilyCode = null;
+
+    // 1. Buscar código SPIGGY-<base64> dentro de cualquier mensaje de WhatsApp/texto
+    const spiggyMatch = rawText.match(/SPIGGY-([A-Za-z0-9+/=_-]+)/);
+    if (spiggyMatch) {
+      base64Candidate = spiggyMatch[1];
+    }
+
+    // 2. O buscar parámetro ?sb=<base64> si pegaron la URL completa
+    if (!base64Candidate) {
+      const sbMatch = rawText.match(/[?&]sb=([A-Za-z0-9+/=%_-]+)/);
+      if (sbMatch) {
+        base64Candidate = decodeURIComponent(sbMatch[1]);
+      }
+    }
+
+    // 3. Extraer family=<codigo> si viene en una URL
+    const famMatch = rawText.match(/[?&]family=([A-Za-z0-9_-]+)/);
+    if (famMatch) {
+      extractedFamilyCode = decodeURIComponent(famMatch[1]).toUpperCase();
+    }
+
+    // 4. Si pegaron directamente el bloque base64 puro
+    if (!base64Candidate && !extractedFamilyCode && rawText.length > 20 && !rawText.includes(' ')) {
+      base64Candidate = rawText;
+    }
+
+    let decoded = null;
+    if (base64Candidate) {
+      try {
+        decoded = JSON.parse(atob(base64Candidate));
+      } catch {
+        decoded = null;
+      }
+    }
+
+    if (!decoded && !extractedFamilyCode) {
+      this.showToast('No encontramos una clave válida en ese texto. Pega el mensaje completo o enlace que enviaste desde el otro equipo.', 'danger');
+      return;
+    }
+
+    const finalFamilyCode = (decoded?.f || extractedFamilyCode || this.state.family.familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
+    const provider = decoded?.p || 'SUPABASE_REST';
+    const endpointUrl = (decoded?.u || '').trim();
+    const apiKey = (decoded?.k || '').trim();
+    const tableName = (decoded?.t || 'smartpiggy_families').trim();
+
+    this.state.family.familyCode = finalFamilyCode;
+    this.cloudManager.familyCode = finalFamilyCode;
+    if (endpointUrl && apiKey) {
+      this.cloudManager.saveCloudConfig({
+        provider,
+        endpointUrl,
+        apiKey,
+        tableName
+      });
+    }
+
+    this.populateCloudConfigInputs();
+    if (inputEl) inputEl.value = '';
+
+    await this.cloudManager.pullFromCloud(this.state, true);
+    await this.cloudManager.pushState(this.state);
+    await this.runLedgerAuditAndRender();
+
+    this.showToast(`¡Equipo conectado a la familia ${finalFamilyCode} en tiempo real!`, 'success');
+  }
+
+  async copyChildReadOnlyShareLink() {
+    const payload = this.buildShareConnectionPayload();
+    try {
+      await navigator.clipboard.writeText(payload.shareUrl);
+      this.showToast('Enlace con auto-conexión en tiempo real copiado al portapapeles.', 'info');
+    } catch {
+      this.showToast(`Enlace para Hijos: ${payload.shareUrl}`, 'info');
     }
   }
 
@@ -4782,6 +4992,4 @@ window.addEventListener('DOMContentLoaded', () => {
   app.init();
 });
 
-
 })();
-

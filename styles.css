@@ -844,7 +844,7 @@ dialog.app-dialog::backdrop {
 /* Toast Notification */
 .toast-container {
   position: fixed;
-  bottom: 1.25rem;
+  bottom: 5.25rem;
   right: 1.25rem;
   z-index: 100;
   display: flex;
@@ -864,6 +864,78 @@ dialog.app-dialog::backdrop {
   max-width: 360px;
 }
 
+/* Botón Flotante Fijo (FAB) para Añadir Movimiento desde cualquier ventana */
+.fab-add-movement {
+  position: fixed;
+  bottom: 1.35rem;
+  right: 1.35rem;
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.88rem 1.35rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(135deg, #4f46e5, #10b981);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 14px 32px rgba(16, 185, 129, 0.4), 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fab-add-movement:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 18px 36px rgba(16, 185, 129, 0.52), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.fab-add-movement:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Selector rápido Sumar Dinero / Restar Gasto dentro del modal de Movimiento */
+.tx-mode-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-bottom: 1.1rem;
+  background: var(--bg-elevated);
+  padding: 0.35rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.tx-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.tx-mode-btn.active-income {
+  background: var(--color-income);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+.tx-mode-btn.active-expense {
+  background: var(--color-expense);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(244, 63, 94, 0.35);
+}
+
 /* ==========================================================================
    AJUSTES RESPONSIVOS PARA CELULARES (Ventanas Emergentes al 100% del Ancho)
    ========================================================================== */
@@ -873,7 +945,7 @@ dialog.app-dialog::backdrop {
   }
 
   .app-container {
-    padding: 0.9rem;
+    padding: 0.9rem 0.9rem 5.5rem 0.9rem;
   }
 
   .equal-col-grid {
@@ -910,10 +982,17 @@ dialog.app-dialog::backdrop {
     font-size: 16px; /* Evita auto-zoom en iOS/Android al tocar un campo */
   }
 
+  .fab-add-movement {
+    bottom: 1rem;
+    right: 1rem;
+    padding: 0.82rem 1.15rem;
+    font-size: 0.9rem;
+  }
+
   .toast-container {
     left: 0.75rem;
     right: 0.75rem;
-    bottom: 0.75rem;
+    bottom: 4.8rem;
   }
 
   .toast {

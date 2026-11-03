@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>SmartPiggy Cloud — Alcancías Digitales Familiares</title>
-  <meta name="description" content="Control de alcancías digitales para niños y jóvenes con ingresos, gastos, créditos, inversiones y sincronización en tiempo real." />
+  <meta name="description" content="Control de alcancías digitales para niños y jóvenes con ingresos, gastos, préstamos, ahorros a plazo y sincronización en tiempo real." />
   <meta name="theme-color" content="#4f46e5" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,20 +19,20 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-role="CHILD">
-  <!-- Barra Superior de Nivel de Acceso y Seguridad por Roles -->
+  <!-- Barra Superior de Nivel de Acceso (Lenguaje claro 9-17 años) -->
   <div class="role-top-strip" id="roleTopStrip">
     <div id="roleStatusText" class="inline-icon-text">
       <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-      <span><strong>MODO HIJO (SOLO LECTURA ACTIVO):</strong> Puedes explorar tus ahorros, inversiones, préstamos y usar el Laboratorio Financiero. Los saldos están protegidos con firma criptográfica parental.</span>
+      <span><strong>MODO HIJO (SOLO VER):</strong> Puedes revisar tu dinero, tus metas, tus préstamos y jugar en el Simulador. Solo Papá o Mamá pueden hacer cambios con su PIN.</span>
     </div>
     <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
       <span id="parentSessionTimerBadge" class="badge badge-warn parent-only" style="background: rgba(255,255,255,0.2); color: #fff;">
         <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-        Firma HMAC-SHA256 activa
+        Modo Papá Activo
       </span>
       <button type="button" class="btn btn-sm" id="btnToggleRole" style="background: #ffffff; color: #0f172a;">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Entrar a Modo Papá (PIN)
+        Soy Papá / Mamá (PIN)
       </button>
     </div>
   </div>
@@ -47,7 +47,7 @@
         <div>
           <h1 class="brand-title" id="familyTitleHeader">SmartPiggy Cloud</h1>
           <p class="brand-subtitle">
-            Código Familiar: <strong id="familyCodeDisplay">FAM-2026-KIDS</strong> · Ledger CRDT Firmado
+            Código de Familia: <strong id="familyCodeDisplay">FAM-2026-KIDS</strong>
           </p>
         </div>
       </div>
@@ -58,75 +58,71 @@
           Instalar App
         </button>
 
-        <button type="button" class="cloud-pill" id="btnOpenCloudDialog" title="Configurar Base de Datos en la Nube y Multi-Dispositivo">
+        <button type="button" class="cloud-pill" id="btnOpenCloudDialog" title="Ver conexión en tiempo real y compartir con otros celulares">
           <span class="cloud-dot" id="cloudStatusDot"></span>
           <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-          <span id="cloudStatusLabel">Nube Sincronizada</span>
+          <span id="cloudStatusLabel">Conectado en Vivo</span>
         </button>
 
-        <button type="button" class="btn btn-ghost btn-sm" id="btnOpenChildWindow" title="Abrir ventana en Modo Hijo de solo lectura para probar sincronización en tiempo real">
+        <button type="button" class="btn btn-ghost btn-sm" id="btnOpenChildWindow" title="Abrir otra pantalla en Modo Hijo para ver cómo se actualiza sola">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="14" height="10" rx="2"/><line x1="6" y1="18" x2="12" y2="18"/><line x1="9" y1="14" x2="9" y2="18"/><rect x="16" y="9" width="6" height="11" rx="1"/></svg>
-          Abrir Vista Hijo en Paralelo
+          Ver Pantalla Hijo
         </button>
 
-        <button type="button" class="btn btn-ghost btn-sm" id="btnToggleTheme" aria-label="Cambiar tema claro u oscuro">
+        <button type="button" class="btn btn-ghost btn-sm" id="btnToggleTheme" aria-label="Cambiar color claro u oscuro">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-          Tema
+          Color
         </button>
       </div>
     </div>
   </header>
 
   <main class="app-container">
-    <!-- Banners dinámicos (Automatizaciones pendientes, Solicitudes de hijos, Alertas de Integridad) -->
+    <!-- Avisos importantes en lenguaje sencillo -->
     <div id="dynamicBannersArea"></div>
 
-    <!-- Selector de Perfiles de Hijos + Acciones Rápidas de Papás -->
-    <section class="profile-bar" aria-label="Selector de alcancías y acciones rápidas">
-      <div class="child-tabs" id="childProfileTabs">
-        <!-- Renderizado dinámico con iconos SVG por app.js -->
-      </div>
+    <!-- Selector de Alcancías + Botones Rápidos Simples -->
+    <section class="profile-bar" aria-label="Selector de alcancías y botones rápidos">
+      <div class="child-tabs" id="childProfileTabs"></div>
 
       <div class="quick-actions-row">
-        <!-- Controles exclusivos de MODO PAPÁ -->
         <button type="button" class="btn btn-income parent-only" id="btnQuickIncome">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Registrar Ingreso
+          Sumar Dinero
         </button>
         <button type="button" class="btn btn-expense parent-only" id="btnQuickExpense">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Descontar Gasto
+          Restar Gasto
         </button>
         <button type="button" class="btn btn-invest parent-only" id="btnQuickInvest">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-          Invertir a Plazo
+          Guardar a Plazo
         </button>
         <button type="button" class="btn btn-loan parent-only" id="btnQuickLoan">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-          Otorgar Crédito
+          Dar Préstamo
         </button>
 
-        <!-- Botón visible en Modo Hijo para ir directo al Simulador y pedir permiso a Papá -->
         <button type="button" class="btn btn-warn" id="btnGoSandbox">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>
-          Simular / Pedir a Papás
+          Probar en Simulador
         </button>
       </div>
     </section>
 
-    <!-- 4 Tarjetas Patrimoniales Clave (Estado 100% derivado por Reduce del Ledger) -->
-    <section class="kpi-grid" aria-label="Resumen patrimonial de la alcancía">
+    <!-- 4 Tarjetas Principales (Lenguaje fácil 9-17 años) -->
+    <section class="kpi-grid" aria-label="Resumen de tu alcancía">
       <article class="kpi-card" style="--kpi-accent: var(--color-income);">
         <div class="kpi-header">
           <span class="inline-icon-text">
             <svg class="svg-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2h0V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><circle cx="16" cy="11" r="1" fill="currentColor"/></svg>
-            Saldo Disponible en Alcancía
+            Dinero Disponible
           </span>
-          <span class="badge badge-success">Líquido</span>
+          <span class="badge badge-success">Listo para usar</span>
         </div>
         <div class="kpi-value" id="kpiAvailable">$0.00</div>
         <div class="kpi-meta">
-          <span id="kpiAvailableSub">Listo para ahorrar, invertir o gastar</span>
+          <span id="kpiAvailableSub">Lo que tienes libre en tu alcancía</span>
         </div>
       </article>
 
@@ -134,13 +130,13 @@
         <div class="kpi-header">
           <span class="inline-icon-text">
             <svg class="svg-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-            Invertido a Plazo Fijo
+            Guardado a Plazo
           </span>
           <span class="badge badge-info" id="kpiInvestCountBadge">0 activos</span>
         </div>
         <div class="kpi-value" id="kpiInvested">$0.00</div>
         <div class="kpi-meta">
-          <span>Rendimiento devengado hoy:</span>
+          <span>Ganancia acumulada hoy:</span>
           <strong style="color: var(--color-income);" id="kpiAccruedYield">+$0.00</strong>
         </div>
       </article>
@@ -149,13 +145,13 @@
         <div class="kpi-header">
           <span class="inline-icon-text">
             <svg class="svg-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-            Saldo de Créditos por Pagar
+            Préstamos por Pagar
           </span>
           <span class="badge badge-purple" id="kpiLoanCountBadge">0 activos</span>
         </div>
         <div class="kpi-value" id="kpiDebt">$0.00</div>
         <div class="kpi-meta">
-          <span id="kpiNextLoanDue">Sin cuotas pendientes</span>
+          <span id="kpiNextLoanDue">No debes nada</span>
         </div>
       </article>
 
@@ -163,71 +159,69 @@
         <div class="kpi-header">
           <span class="inline-icon-text">
             <svg class="svg-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 18 3 22 9 12 22 2 9"/><line x1="2" y1="9" x2="22" y2="9"/><polyline points="12 22 16 9 13 3"/><polyline points="12 22 8 9 11 3"/></svg>
-            Patrimonio Neto Total
+            Total de Todo tu Dinero
           </span>
-          <span class="badge badge-warn">Disponible + Inversión - Deuda</span>
+          <span class="badge badge-warn">Disponible + Guardado - Deuda</span>
         </div>
         <div class="kpi-value" id="kpiNetWorth">$0.00</div>
         <div class="kpi-meta">
-          <span>Rendimientos ganados históricos:</span>
+          <span>Premios ganados por ahorrar:</span>
           <strong style="color: var(--color-income);" id="kpiHistoricalYield">+$0.00</strong>
         </div>
       </article>
     </section>
 
-    <!-- Barra de Meta de Ahorro del Hijo Seleccionado -->
-    <section class="goal-banner" id="goalBannerSection">
-      <!-- Renderizado dinámico con SVG por app.js -->
-    </section>
+    <!-- Barra de Meta de Ahorro -->
+    <section class="goal-banner" id="goalBannerSection"></section>
 
-    <!-- Pestañas de Navegación Funcional (Iconos SVG) -->
+    <!-- Pestañas con nombres simples para niños y jóvenes -->
     <nav class="nav-tabs" role="tablist" aria-label="Secciones de la aplicación">
       <button type="button" class="nav-tab active" data-tab="tab-movements" role="tab" aria-selected="true">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-        Movimientos y Categorías
+        Historial y Gastos
       </button>
       <button type="button" class="nav-tab" data-tab="tab-recurring" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        Ingresos Recurrentes
+        Mesadas Automáticas
       </button>
       <button type="button" class="nav-tab" data-tab="tab-loans" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-        Créditos e Intereses
+        Préstamos
       </button>
       <button type="button" class="nav-tab" data-tab="tab-investments" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-        Inversiones a Plazo
+        Ahorro con Ganancia
       </button>
       <button type="button" class="nav-tab" data-tab="tab-users-catalogs" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Usuarios, Fuentes y Categorías
+        Familia y Categorías
       </button>
       <button type="button" class="nav-tab sandbox-tab" data-tab="tab-sandbox" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>
-        Laboratorio Financiero (Simulador)
+        Simulador
       </button>
       <button type="button" class="nav-tab" data-tab="tab-cloud-security" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-        Nube Multi-Dispositivo y Auditoría
+        Conectar Dispositivos
       </button>
     </nav>
 
-    <!-- PANEL 1: MOVIMIENTOS, DESCUENTO DE GASTOS, INGRESOS Y ANALÍTICA -->
+    <!-- PANEL 1: HISTORIAL Y GASTOS -->
     <section class="tab-panel active" id="tab-movements" role="tabpanel">
       <div class="two-col-grid">
         <div class="panel-card">
           <div class="panel-header">
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-              Libro Mayor de Movimientos (Firmado HMAC-SHA256)
+              Historial de Entradas y Salidas de Dinero
             </h2>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-              <select id="filterTxType" class="form-select" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;" aria-label="Filtrar movimientos por tipo">
-                <option value="ALL">Todos los movimientos</option>
-                <option value="INCOME">Solo Ingresos y Mesadas</option>
-                <option value="EXPENSE">Solo Gastos descontados</option>
-                <option value="LOAN">Movimientos de Créditos</option>
-                <option value="INVESTMENT">Movimientos de Inversión</option>
+              <select id="filterTxType" class="form-select" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;" aria-label="Filtrar movimientos">
+                <option value="ALL">Ver todo</option>
+                <option value="INCOME">Solo Dinero Recibido</option>
+                <option value="EXPENSE">Solo Gastos</option>
+                <option value="LOAN">Solo Préstamos</option>
+                <option value="INVESTMENT">Solo Ahorro a Plazo</option>
               </select>
             </div>
           </div>
@@ -239,7 +233,7 @@
             <div class="panel-header">
               <h3 class="panel-title">
                 <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="17" y1="7" x2="7" y2="17"/><polyline points="17 17 7 17 7 7"/></svg>
-                Distribución por Fuente de Ingreso
+                ¿De dónde ha llegado tu dinero?
               </h3>
             </div>
             <div id="incomeSourcesChartContainer"></div>
@@ -249,7 +243,7 @@
             <div class="panel-header">
               <h3 class="panel-title">
                 <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-                Distribución por Categoría de Gasto
+                ¿En qué has gastado?
               </h3>
             </div>
             <div id="expenseCategoriesChartContainer"></div>
@@ -258,88 +252,88 @@
       </div>
     </section>
 
-    <!-- PANEL 2: INGRESOS RECURRENTES PROGRAMADOS -->
+    <!-- PANEL 2: MESADAS AUTOMÁTICAS -->
     <section class="tab-panel" id="tab-recurring" role="tabpanel">
       <div class="panel-card">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-              Programación de Ingresos Recurrentes (Mesadas y Domingos)
+              Mesadas y Domingos Automáticos
             </h2>
             <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);">
-              Acreditación idempotente con llave determinista (<code>det_rec_&lt;ruleId&gt;_&lt;periodKey&gt;</code>) y opción de descuento automático para pagar cuotas de crédito.
+              Dinero que se suma de forma periódica (cada semana, quincena o mes).
             </p>
           </div>
           <button type="button" class="btn btn-primary parent-only" id="btnOpenRecurringModal">
             <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Programar Nuevo Ingreso Recurrente
+            Programar Nueva Mesada
           </button>
         </div>
         <div class="equal-col-grid" id="recurringRulesContainer"></div>
       </div>
     </section>
 
-    <!-- PANEL 3: CRÉDITOS CON TASA DE INTERÉS Y TABLA DE AMORTIZACIÓN -->
+    <!-- PANEL 3: PRÉSTAMOS -->
     <section class="tab-panel" id="tab-loans" role="tabpanel">
       <div class="panel-card">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-              Centro de Créditos Familiares y Tablas de Amortización
+              Mis Préstamos y Pagos
             </h2>
             <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);">
-              Soporta <strong>Interés Simple</strong> e <strong>Interés Compuesto (Sistema Francés)</strong> con ajuste exacto de centavos en la cuota final y Abonos Extraordinarios a Capital.
+              Revisa cuánto falta por pagar en cada préstamo y cómo ahorras intereses si adelantas pagos.
             </p>
           </div>
           <button type="button" class="btn btn-loan parent-only" id="btnOpenLoanModal">
             <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Otorgar Nuevo Crédito con Interés
+            Nuevo Préstamo
           </button>
         </div>
         <div id="loansListContainer"></div>
       </div>
     </section>
 
-    <!-- PANEL 4: INVERSIONES A PLAZO CON RENDIMIENTOS -->
+    <!-- PANEL 4: AHORRO CON GANANCIA (INVERSIONES A PLAZO) -->
     <section class="tab-panel" id="tab-investments" role="tabpanel">
       <div class="panel-card">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-              Bóveda de Inversiones a Plazo Fijo con Rendimientos
+              Bóveda de Ahorro con Ganancia
             </h2>
             <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);">
-              Congela saldo disponible durante el plazo elegido para ganar rendimientos garantizados al vencimiento.
+              Guarda una parte de tu dinero por varios días sin tocarlo y gana dinero extra al terminar el plazo.
             </p>
           </div>
           <button type="button" class="btn btn-invest parent-only" id="btnOpenInvestmentModal">
             <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Nueva Inversión a Plazo Fijo
+            Guardar Dinero a Plazo
           </button>
         </div>
         <div class="equal-col-grid" id="investmentsListContainer"></div>
       </div>
     </section>
 
-    <!-- PANEL 5: DEFINICIÓN DE USUARIOS (PAPÁS E HIJOS), FUENTES DE INGRESOS Y CATEGORÍAS DE GASTOS -->
+    <!-- PANEL 5: FAMILIA Y CATEGORÍAS -->
     <section class="tab-panel" id="tab-users-catalogs" role="tabpanel">
       <div class="panel-card">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              Usuarios de la Familia (2 Niveles de Acceso: Papás vs. Hijos)
+              Integrantes de la Familia (Papás e Hijos)
             </h2>
             <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);">
-              Los perfiles <strong>PAPÁ/MAMÁ</strong> tienen permisos de administración firmados; los perfiles <strong>HIJO/A</strong> tienen acceso exclusivo de lectura a su información.
+              Los <strong>Papás</strong> pueden hacer cambios con PIN; los <strong>Hijos</strong> pueden consultar toda su información.
             </p>
           </div>
           <button type="button" class="btn btn-primary parent-only" id="btnOpenMemberModal">
             <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Agregar Usuario (Papá o Hijo)
+            Agregar Integrante
           </button>
         </div>
         <div class="equal-col-grid" id="membersListContainer"></div>
@@ -350,11 +344,11 @@
           <div class="panel-header">
             <h3 class="panel-title">
               <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="17" y1="7" x2="7" y2="17"/><polyline points="17 17 7 17 7 7"/></svg>
-              Fuentes de Ingresos Definidas
+              Formas de Ganar Dinero
             </h3>
             <button type="button" class="btn btn-income btn-sm parent-only" id="btnAddIncomeSource">
               <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nueva Fuente
+              Agregar Forma de Ganar
             </button>
           </div>
           <div class="tx-list" id="incomeSourcesCatalogList"></div>
@@ -364,11 +358,11 @@
           <div class="panel-header">
             <h3 class="panel-title">
               <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-              Categorías de Gastos Definidas
+              Tipos de Gastos
             </h3>
             <button type="button" class="btn btn-expense btn-sm parent-only" id="btnAddExpenseCategory">
               <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nueva Categoría
+              Agregar Tipo de Gasto
             </button>
           </div>
           <div class="tx-list" id="expenseCategoriesCatalogList"></div>
@@ -376,34 +370,33 @@
       </div>
     </section>
 
-    <!-- PANEL 6: LABORATORIO FINANCIERO EDUCATIVO (SANDBOX PARA HIJOS + SOLICITUDES A PAPÁS) -->
+    <!-- PANEL 6: SIMULADOR PARA NIÑOS Y JÓVENES -->
     <section class="tab-panel" id="tab-sandbox" role="tabpanel">
       <div class="sandbox-container">
         <div class="sandbox-ribbon">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>
-          MODO SIMULADOR EDUCATIVO (SANDBOX) — NO MODIFICA TU DINERO REAL
+          ZONA DE PRUEBAS — NO CAMBIA TU DINERO REAL
         </div>
         <h2 style="margin: 0 0 0.4rem 0; font-size: 1.25rem;">
-          Aprende cómo funciona el Interés a tu Favor (Inversión) vs. en tu Contra (Crédito)
+          Prueba cuánto ganarías ahorrando o cuánto te costaría pedir prestado
         </h2>
         <p style="margin: 0 0 1.35rem 0; color: var(--text-secondary); font-size: 0.9rem;">
-          Los hijos pueden experimentar libremente aquí sin alterar ningún dato de la base de datos y enviar una <strong>Solicitud a Papá/Mamá</strong> para que la aprueben en Modo Papá.
+          Mueve los controles para hacer pruebas. Si te gusta una idea, toca el botón para <strong>enviársela a tus Papás</strong> y que la aprueben.
         </p>
 
         <div class="two-col-grid">
-          <!-- Simulador de Inversión a Plazo -->
           <div class="panel-card" style="margin-bottom: 0;">
             <h3 class="panel-title">
               <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-              Simulador de Inversión a Plazo
+              Calcular Ganancia por Guardar Dinero
             </h3>
             <div class="form-group">
-              <label class="form-label" for="simInvAmount">Monto a invertir ($): <strong id="simInvAmountLabel">$300.00</strong></label>
+              <label class="form-label" for="simInvAmount">¿Cuánto quieres guardar? <strong id="simInvAmountLabel">$300.00</strong></label>
               <input type="range" id="simInvAmount" min="50" max="5000" step="50" value="300" style="width: 100%;" />
             </div>
             <div class="form-grid">
               <div class="form-group">
-                <label class="form-label" for="simInvDays">Plazo (Días)</label>
+                <label class="form-label" for="simInvDays">¿Por cuántos días?</label>
                 <select id="simInvDays" class="form-select">
                   <option value="7">7 días (1 semana)</option>
                   <option value="14">14 días (2 semanas)</option>
@@ -413,7 +406,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label" for="simInvRate">Tasa de Rendimiento (%)</label>
+                <label class="form-label" for="simInvRate">Premio / Ganancia (%)</label>
                 <input type="number" id="simInvRate" class="form-input" value="10" min="1" max="50" step="0.5" />
               </div>
             </div>
@@ -422,39 +415,38 @@
 
             <button type="button" class="btn btn-invest" id="btnSendInvestRequest" style="width: 100%;">
               <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              Enviar Solicitud de esta Inversión a mis Papás
+              Pedir este Ahorro a mis Papás
             </button>
           </div>
 
-          <!-- Simulador de Crédito con Interés -->
           <div class="panel-card" style="margin-bottom: 0;">
             <h3 class="panel-title">
               <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-              Simulador de Crédito y Costo de Intereses
+              Calcular un Préstamo
             </h3>
             <div class="form-group">
-              <label class="form-label" for="simLoanAmount">Monto a pedir prestado ($): <strong id="simLoanAmountLabel">$500.00</strong></label>
+              <label class="form-label" for="simLoanAmount">¿Cuánto necesitas pedir prestado? <strong id="simLoanAmountLabel">$500.00</strong></label>
               <input type="range" id="simLoanAmount" min="50" max="5000" step="50" value="500" style="width: 100%;" />
             </div>
             <div class="form-grid">
               <div class="form-group">
-                <label class="form-label" for="simLoanPeriods">Número de Cuotas</label>
+                <label class="form-label" for="simLoanPeriods">¿En cuántos pagos?</label>
                 <select id="simLoanPeriods" class="form-select">
-                  <option value="2">2 cuotas</option>
-                  <option value="4" selected>4 cuotas</option>
-                  <option value="6">6 cuotas</option>
-                  <option value="12">12 cuotas</option>
+                  <option value="2">2 pagos</option>
+                  <option value="4" selected>4 pagos</option>
+                  <option value="6">6 pagos</option>
+                  <option value="12">12 pagos</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label" for="simLoanRate">Tasa por Periodo (%)</label>
+                <label class="form-label" for="simLoanRate">Interés por pago (%)</label>
                 <input type="number" id="simLoanRate" class="form-input" value="5" min="0" max="30" step="0.5" />
               </div>
               <div class="form-group full">
-                <label class="form-label" for="simLoanType">Tipo de Interés</label>
+                <label class="form-label" for="simLoanType">Forma de calcular el interés</label>
                 <select id="simLoanType" class="form-select">
-                  <option value="SIMPLE">Interés Simple (Fácil de calcular)</option>
-                  <option value="COMPOUND_FRENCH">Interés Compuesto (Amortización Francesa)</option>
+                  <option value="SIMPLE">Interés Simple (Siempre igual en cada pago)</option>
+                  <option value="COMPOUND_FRENCH">Interés Compuesto (Pagos fijos sobre lo que debes)</option>
                 </select>
               </div>
             </div>
@@ -463,17 +455,16 @@
 
             <button type="button" class="btn btn-loan" id="btnSendLoanRequest" style="width: 100%;">
               <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              Enviar Solicitud de este Crédito a mis Papás
+              Pedir este Préstamo a mis Papás
             </button>
           </div>
         </div>
 
-        <!-- Bandeja de Solicitudes Enviadas por los Hijos -->
         <div class="panel-card" style="margin-top: 1.35rem; margin-bottom: 0;">
           <div class="panel-header">
             <h3 class="panel-title">
               <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-              Bandeja de Solicitudes de Hijos a Papás
+              Pedidos Enviados a Papá y Mamá
             </h3>
           </div>
           <div id="childRequestsListContainer"></div>
@@ -481,68 +472,102 @@
       </div>
     </section>
 
-    <!-- PANEL 7: BASE DE DATOS EN LA NUBE (SUPABASE PROYECTO EXISTENTE EN TIEMPO REAL) Y AUDITORÍA CRIPTOGRÁFICA -->
+    <!-- PANEL 7: CONECTAR DISPOSITIVOS Y COMPARTIR CONEXIÓN SUPABASE EN UN MENSAJE -->
     <section class="tab-panel" id="tab-cloud-security" role="tabpanel">
       <div class="two-col-grid">
         <div class="panel-card">
           <div class="panel-header">
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-              Supabase en Tiempo Real (Reutilizando tu Proyecto Existente)
+              Conectar Celulares en Tiempo Real (Supabase)
             </h2>
             <span class="badge badge-success" id="realtimeStreamStatusBadge">
               <svg class="svg-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              Auto-Sync Tiempo Real Activo
+              Tiempo Real Activo
             </span>
           </div>
-          <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 0;">
-            Puedes alojar esta base de datos dentro de <strong>cualquier proyecto que ya tengas en tu cuenta de Supabase</strong> sin crear un proyecto nuevo: usa únicamente una tabla aislada (<code>public.smartpiggy_families</code>) que no interfiere con tus demás tablas, y sincroniza cada cambio <strong>automáticamente en tiempo real por WebSocket</strong> sin necesidad de botones manuales.
-          </p>
+
+          <!-- BLOQUE DESTACADO: COMPARTIR Y RECIBIR CONEXIÓN EN UN MENSAJE -->
+          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.15rem;">
+            <h3 class="inline-icon-text" style="margin: 0 0 0.35rem 0; font-size: 0.96rem; color: var(--color-income);">
+              <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Compartir Conexión con la Familia en un Mensaje
+            </h3>
+            <p style="margin: 0 0 0.75rem 0; font-size: 0.83rem; color: var(--text-secondary);">
+              Una vez que este dispositivo ya tiene las claves de Supabase puestas, toca un botón para enviar por <strong>WhatsApp o Mensaje</strong> el enlace y el código a los demás celulares para que se conecten solos sin escribir las claves:
+            </p>
+            <div style="display: flex; gap: 0.55rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+              <button type="button" class="btn btn-income btn-sm" id="btnShareSupabaseMessage">
+                <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Compartir Mensaje de Conexión
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" id="btnShareWhatsAppDirect">
+                <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Enviar por WhatsApp
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" id="btnCopyChildShareLink">
+                <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                Copiar Solo el Link
+              </button>
+            </div>
+
+            <!-- Pegar mensaje recibido si ya instalaron la app en otro celular -->
+            <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.7rem;">
+              <label class="form-label" for="inputPasteConnectionCode" style="display: block; margin-bottom: 0.35rem;">
+                ¿Recibiste un mensaje de conexión en este celular? Pégalo aquí para conectarte al instante:
+              </label>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <input type="text" id="inputPasteConnectionCode" class="form-input" placeholder="Pega aquí el mensaje o código SPIGGY-..." style="flex: 1; min-width: 180px;" />
+                <button type="button" class="btn btn-primary btn-sm" id="btnApplyPastedConnection">
+                  Conectar con Mensaje
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div class="notice-banner info" style="margin-bottom: 1rem; padding: 0.7rem 0.95rem;">
             <div class="inline-icon-text" id="liveConnectionDetailBox">
               <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              <span><strong>Transmisión en Tiempo Real Automática:</strong> Al pegar tu <em>Project URL</em> y tu <em>Anon Key</em> de Supabase, el canal WebSocket (<code>wss://.../realtime/v1/websocket</code>) se conecta solo y replica cada movimiento al instante en todos los dispositivos.</span>
+              <span><strong>Sincronización en Tiempo Real Automática:</strong> Al poner tu <em>Project URL</em> y tu <em>Anon Key</em> de Supabase en el primer equipo, se conecta en vivo y luego puedes compartirlo con un mensaje a los demás.</span>
             </div>
           </div>
 
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label" for="cloudFamilyCodeInput">Código Familiar (ID de Sincronización)</label>
+              <label class="form-label" for="cloudFamilyCodeInput">Código de Familia</label>
               <input type="text" id="cloudFamilyCodeInput" class="form-input" value="FAM-2026-KIDS" />
             </div>
             <div class="form-group">
-              <label class="form-label" for="cloudProviderSelect">Motor de Sincronización en Tiempo Real</label>
+              <label class="form-label" for="cloudProviderSelect">Servicio de Nube</label>
               <select id="cloudProviderSelect" class="form-select">
-                <option value="SUPABASE_REST" selected>Supabase Realtime + PostgreSQL (Tu Proyecto Actual)</option>
-                <option value="ZERO_CONFIG_CLOUD">Canal Tiempo Real Local / LAN (/api/cloud + BroadcastChannel)</option>
-                <option value="FIREBASE_RTDB">Google Firebase Realtime Database</option>
+                <option value="SUPABASE_REST" selected>Supabase en Tiempo Real (Tu Proyecto Actual)</option>
+                <option value="ZERO_CONFIG_CLOUD">Red Local / Mismo Dispositivo</option>
+                <option value="FIREBASE_RTDB">Google Firebase Realtime DB</option>
               </select>
             </div>
             <div class="form-group full" id="cloudEndpointGroup">
-              <label class="form-label" for="cloudEndpointInput">Project URL de tu proyecto existente en Supabase (Settings → API)</label>
+              <label class="form-label" for="cloudEndpointInput">Project URL de Supabase (Settings → API)</label>
               <input type="url" id="cloudEndpointInput" class="form-input" placeholder="https://xxxxxxxxxxxx.supabase.co" />
             </div>
             <div class="form-group" id="cloudApiKeyGroup">
-              <label class="form-label" for="cloudApiKeyInput">Project API Key (<code>anon</code> / <code>public</code>)</label>
+              <label class="form-label" for="cloudApiKeyInput">Clave Pública (<code>anon</code> / <code>public</code>)</label>
               <input type="password" id="cloudApiKeyInput" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." />
             </div>
             <div class="form-group">
-              <label class="form-label" for="cloudTableNameInput">Tabla Aislada en tu Proyecto</label>
+              <label class="form-label" for="cloudTableNameInput">Nombre de Tabla Aislada</label>
               <input type="text" id="cloudTableNameInput" class="form-input" value="smartpiggy_families" />
             </div>
           </div>
 
-          <!-- Bloque SQL de 1 sola tabla para pegar en el SQL Editor del proyecto existente de Supabase -->
           <div style="background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.9rem; margin-bottom: 1rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.45rem;">
               <strong class="inline-icon-text" style="font-size: 0.82rem;">
                 <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                SQL de 1 Tabla Aislada para tu Proyecto Existente de Supabase (No afecta otras tablas)
+                SQL de 1 Tabla para tu Proyecto de Supabase (Solo se ejecuta 1 vez)
               </strong>
               <button type="button" class="btn btn-primary btn-sm" id="btnCopySupabaseSql">
                 <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                Copiar SQL para Supabase SQL Editor
+                Copiar SQL
               </button>
             </div>
             <pre id="supabaseSqlBlock" style="margin: 0; font-family: var(--font-mono); font-size: 0.73rem; color: var(--text-secondary); overflow-x: auto; white-space: pre-wrap;">create table if not exists public.smartpiggy_families (
@@ -556,17 +581,13 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
           </div>
 
           <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 0.5rem;">
-            <button type="button" class="btn btn-ghost" id="btnCopyChildShareLink">
-              <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              Copiar Enlace de Solo-Lectura para Hijos
-            </button>
             <button type="button" class="btn btn-ghost" id="btnExportCloudJson">
               <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Exportar Respaldo Cloud JSON Firmado
+              Descargar Copia de Seguridad
             </button>
             <label class="btn btn-ghost parent-only" style="cursor: pointer;">
               <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Importar Respaldo JSON
+              Cargar Copia Guardada
               <input type="file" id="inputImportCloudJson" accept=".json" style="display: none;" />
             </label>
           </div>
@@ -576,32 +597,32 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
           <div class="parent-only">
             <h3 class="inline-icon-text" style="margin: 0 0 0.5rem 0; font-size: 0.95rem;">
               <svg class="svg-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
-              Seguridad Parental: Cambiar PIN de Administración
+              Cambiar PIN de Papá y Mamá
             </h3>
             <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
-              <input type="password" id="newParentPinInput" class="form-input" placeholder="Nuevo PIN (4-8 dígitos)" maxlength="8" style="max-width: 220px;" />
+              <input type="password" id="newParentPinInput" class="form-input" placeholder="Nuevo PIN (4-8 números)" maxlength="8" style="max-width: 220px;" />
               <button type="button" class="btn btn-primary btn-sm" id="btnUpdateParentPin">
-                Actualizar PIN y Re-Firmar Ledger (PBKDF2 210k)
+                Guardar Nuevo PIN
               </button>
               <button type="button" class="btn btn-ghost btn-sm" id="btnResetDemoData">
                 <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-                Restaurar Datos Demostrativos
+                Reiniciar Datos de Ejemplo
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Panel de Auditoría Criptográfica y Demostración Anti-Manipulación -->
+        <!-- Panel de Seguridad y Protección Anti-Trampas -->
         <div class="panel-card">
           <div class="panel-header">
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-              Auditoría Criptográfica del Libro Mayor (Ronda 2)
+              Escudo Protector de la Alcancía
             </h2>
-            <span class="badge badge-info" id="cryptoAuditStatusBadge">Verificado</span>
+            <span class="badge badge-info" id="cryptoAuditStatusBadge">Todo Seguro</span>
           </div>
           <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 0;">
-            Cada asiento del Libro Mayor está encadenado con <code>SHA-256</code> y firmado con <code>HMAC-SHA256</code> derivado mediante <code>PBKDF2 (210,000 iteraciones)</code>. Si un hijo intenta alterar su saldo desde las herramientas del navegador, la firma se invalida y el movimiento corrupto es rechazado.
+            Cada movimiento lleva un sello secreto de Papá o Mamá. Si alguien intenta cambiar los números sin el PIN parental, el escudo lo detecta al instante y protege tu dinero real.
           </p>
 
           <div id="cryptoAuditSummaryBox" style="background: var(--bg-elevated); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; font-size: 0.84rem;"></div>
@@ -609,11 +630,11 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
           <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
             <button type="button" class="btn btn-warn btn-sm" id="btnSimulateTamperAttack">
               <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>
-              Simular Intento de Hackeo (Inyectar +$9,999 sin firma de Papá)
+              Probar Escudo (Intentar sumar $9,999 sin permiso)
             </button>
             <button type="button" class="btn btn-income btn-sm" id="btnPurgeCorruptedEntries">
               <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-              Limpiar Asientos Apócrifos Detectados
+              Borrar Movimientos Falsos
             </button>
           </div>
         </div>
@@ -621,8 +642,14 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
     </section>
   </main>
 
+  <!-- BOTÓN FLOTANTE FIJO EN CUALQUIER VENTANA DE LA APP PARA AÑADIR MOVIMIENTO -->
+  <button type="button" class="fab-add-movement" id="fabAddMovement" aria-label="Añadir un movimiento desde cualquier pantalla">
+    <svg class="svg-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span>Añadir Movimiento</span>
+  </button>
+
   <!-- ========================================================================
-       MODALES NATIVOS <dialog> CON LIGHT-DISMISS E ICONOS SVG
+       MODALES NATIVOS <dialog> AJUSTADOS AL ANCHO DEL CELULAR E IDIOMA SIMPLE
        ======================================================================== -->
 
   <!-- 1. Modal de Desbloqueo Modo Papá (PIN Parental) -->
@@ -631,7 +658,7 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       <div class="dialog-header">
         <h3 class="dialog-title inline-icon-text">
           <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Acceso a Modo Papá (Administración)
+          Entrar como Papá o Mamá
         </h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogParentPin" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -639,82 +666,95 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       </div>
       <form id="formParentPin">
         <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 0;">
-          Ingresa el PIN Parental para derivar en memoria la llave criptográfica <code>HMAC-SHA256</code> y habilitar la modificación de datos.
+          Escribe el PIN de Papá o Mamá para poder sumar dinero, restar gastos o aprobar pedidos.
           <br />
-          <span class="badge badge-info" style="margin-top: 0.4rem;">PIN demostrativo inicial: <strong>1234</strong></span>
+          <span class="badge badge-info" style="margin-top: 0.4rem;">PIN de prueba inicial: <strong>1234</strong></span>
         </p>
         <div class="form-group">
-          <label class="form-label" for="inputParentPin">PIN de Papá / Mamá</label>
+          <label class="form-label" for="inputParentPin">PIN Secreto</label>
           <input type="password" id="inputParentPin" class="form-input" placeholder="••••" required autocomplete="off" style="font-size: 1.3rem; letter-spacing: 0.25em; text-align: center;" />
         </div>
         <div class="form-group">
-          <label class="form-label" for="selectActiveParent">¿Qué padre realiza los movimientos?</label>
+          <label class="form-label" for="selectActiveParent">¿Quién autoriza?</label>
           <select id="selectActiveParent" class="form-select"></select>
         </div>
         <div id="pinErrorMsg" style="color: var(--color-expense); font-size: 0.82rem; margin-bottom: 0.75rem; display: none;"></div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogParentPin">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Desbloquear Modo Papá</button>
+          <button type="submit" class="btn btn-primary">Entrar</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- 2. Modal de Registro de Ingreso o Descuento de Gasto -->
+  <!-- 2. Modal de Añadir Movimiento (Con selector rápido Sumar Dinero / Restar Gasto) -->
   <dialog class="app-dialog" id="dialogTransaction">
     <div class="dialog-inner">
       <div class="dialog-header">
-        <h3 class="dialog-title inline-icon-text" id="dialogTxTitle">Registrar Movimiento</h3>
+        <h3 class="dialog-title inline-icon-text" id="dialogTxTitle">Añadir Movimiento</h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogTransaction" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
+
+      <!-- Selector rápido Sumar Dinero vs Restar Gasto -->
+      <div class="tx-mode-switcher" role="group" aria-label="Tipo de movimiento">
+        <button type="button" class="tx-mode-btn active-income" id="btnSwitchModeIncome">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Sumar Dinero
+        </button>
+        <button type="button" class="tx-mode-btn" id="btnSwitchModeExpense">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Restar Gasto
+        </button>
+      </div>
+
       <form id="formTransaction">
         <input type="hidden" id="txFormMode" value="INCOME" />
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="txChildSelect">Alcancía del Hijo/a</label>
+            <label class="form-label" for="txChildSelect">¿De quién es la alcancía?</label>
             <select id="txChildSelect" class="form-select" required></select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="txAmountInput">Monto ($)</label>
+            <label class="form-label" for="txAmountInput">Cantidad ($)</label>
             <input type="number" id="txAmountInput" class="form-input" min="0.01" step="0.01" placeholder="Ej. 150.00" required />
           </div>
           <div class="form-group full">
-            <label class="form-label" for="txCatalogSelect" id="txCatalogLabel">Fuente de Ingreso / Categoría de Gasto</label>
+            <label class="form-label" for="txCatalogSelect" id="txCatalogLabel">¿De dónde viene el dinero?</label>
             <select id="txCatalogSelect" class="form-select" required></select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="txDateInput">Fecha Calendario</label>
+            <label class="form-label" for="txDateInput">Fecha</label>
             <input type="date" id="txDateInput" class="form-input" required />
           </div>
           <div class="form-group" id="txOverdraftModeGroup" style="display: none;">
-            <label class="form-label" for="txOverdraftPolicy">Si supera el saldo disponible:</label>
+            <label class="form-label" for="txOverdraftPolicy">Si no alcanza el dinero disponible:</label>
             <select id="txOverdraftPolicy" class="form-select">
-              <option value="BLOCK">Bloquear gasto (Proteger liquidez)</option>
-              <option value="AUTO_LOAN">Convertir faltante en Crédito Familiar (5% simple, 4 sem)</option>
+              <option value="BLOCK">No permitir el gasto</option>
+              <option value="AUTO_LOAN">Prestar lo que falta automáticamente (4 pagos)</option>
             </select>
           </div>
           <div class="form-group full">
-            <label class="form-label" for="txNoteInput">Concepto o Nota Educativa</label>
-            <input type="text" id="txNoteInput" class="form-input" placeholder="Ej. Ahorro de domingo / Compra de libro" required />
+            <label class="form-label" for="txNoteInput">Descripción (¿Por qué fue?)</label>
+            <input type="text" id="txNoteInput" class="form-input" placeholder="Ej. Domingo de la semana / Compra de helado" required />
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogTransaction">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="btnSubmitTx">Firmar y Guardar en Ledger</button>
+          <button type="submit" class="btn btn-primary" id="btnSubmitTx">Guardar Movimiento</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- 3. Modal para Programar Ingreso Recurrente -->
+  <!-- 3. Modal para Programar Mesada Automática -->
   <dialog class="app-dialog" id="dialogRecurring">
     <div class="dialog-inner">
       <div class="dialog-header">
         <h3 class="dialog-title inline-icon-text">
           <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          Programar Ingreso Recurrente
+          Programar Mesada Automática
         </h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogRecurring" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -723,56 +763,56 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       <form id="formRecurring">
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="recChildSelect">Hijo/a Beneficiario</label>
+            <label class="form-label" for="recChildSelect">¿Para quién es?</label>
             <select id="recChildSelect" class="form-select" required></select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="recCatalogSelect">Fuente de Ingreso</label>
+            <label class="form-label" for="recCatalogSelect">Motivo del ingreso</label>
             <select id="recCatalogSelect" class="form-select" required></select>
           </div>
           <div class="form-group full">
-            <label class="form-label" for="recTitleInput">Nombre de la Regla Programada</label>
-            <input type="text" id="recTitleInput" class="form-input" placeholder="Ej. Mesada Semanal por Tareas" required />
+            <label class="form-label" for="recTitleInput">Nombre de la Mesada</label>
+            <input type="text" id="recTitleInput" class="form-input" placeholder="Ej. Domingo Semanal" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="recAmountInput">Monto por Periodo ($)</label>
+            <label class="form-label" for="recAmountInput">Cantidad ($)</label>
             <input type="number" id="recAmountInput" class="form-input" min="1" step="0.5" placeholder="150.00" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="recFrequencySelect">Frecuencia</label>
+            <label class="form-label" for="recFrequencySelect">¿Cada cuánto se entrega?</label>
             <select id="recFrequencySelect" class="form-select">
-              <option value="DAILY">Diario</option>
-              <option value="WEEKLY" selected>Semanal (Cada 7 días)</option>
-              <option value="BIWEEKLY">Quincenal (Cada 14 días)</option>
-              <option value="MONTHLY">Mensual (Cada mes)</option>
+              <option value="DAILY">Todos los días</option>
+              <option value="WEEKLY" selected>Cada semana (7 días)</option>
+              <option value="BIWEEKLY">Cada quincena (14 días)</option>
+              <option value="MONTHLY">Cada mes</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="recNextDateInput">Próxima Fecha de Acreditación</label>
+            <label class="form-label" for="recNextDateInput">Próximo día de entrega</label>
             <input type="date" id="recNextDateInput" class="form-input" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="recAutoLoanSelect">Retención Automática para Crédito</label>
+            <label class="form-label" for="recAutoLoanSelect">¿Apartar para pagar un préstamo?</label>
             <select id="recAutoLoanSelect" class="form-select">
-              <option value="">Sin retención automática</option>
+              <option value="">No, entregar todo libre</option>
             </select>
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogRecurring">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar Regla Recurrente</button>
+          <button type="submit" class="btn btn-primary">Guardar Mesada</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- 4. Modal para Otorgar Crédito con Tasa de Interés -->
+  <!-- 4. Modal para Nuevo Préstamo -->
   <dialog class="app-dialog" id="dialogLoan">
     <div class="dialog-inner">
       <div class="dialog-header">
         <h3 class="dialog-title inline-icon-text">
           <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-          Otorgar Crédito con Tasa de Interés
+          Dar un Préstamo
         </h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogLoan" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -781,45 +821,45 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       <form id="formLoan">
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="loanChildSelect">Hijo/a Acreditado</label>
+            <label class="form-label" for="loanChildSelect">¿A quién se le presta?</label>
             <select id="loanChildSelect" class="form-select" required></select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="loanPrincipalInput">Capital Prestado ($)</label>
+            <label class="form-label" for="loanPrincipalInput">Cantidad prestada ($)</label>
             <input type="number" id="loanPrincipalInput" class="form-input" min="10" step="1" value="400" required />
           </div>
           <div class="form-group full">
-            <label class="form-label" for="loanConceptInput">Concepto del Préstamo</label>
-            <input type="text" id="loanConceptInput" class="form-input" placeholder="Ej. Patineta / Juego de Construcción" required />
+            <label class="form-label" for="loanConceptInput">¿Para qué es el préstamo?</label>
+            <input type="text" id="loanConceptInput" class="form-input" placeholder="Ej. Patineta / Juego nuevo" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="loanInterestType">Método de Cálculo de Interés</label>
+            <label class="form-label" for="loanInterestType">Tipo de interés</label>
             <select id="loanInterestType" class="form-select">
-              <option value="SIMPLE">Interés Simple (Educativo Infantil)</option>
-              <option value="COMPOUND_FRENCH">Interés Compuesto (Amortización Francesa)</option>
+              <option value="SIMPLE">Interés Simple (Fácil de entender)</option>
+              <option value="COMPOUND_FRENCH">Interés Compuesto (Pagos fijos)</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="loanRateInput">Tasa de Interés por Periodo (%)</label>
+            <label class="form-label" for="loanRateInput">Interés por pago (%)</label>
             <input type="number" id="loanRateInput" class="form-input" min="0" max="50" step="0.5" value="5" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="loanPeriodsInput">Plazo (Número de Cuotas)</label>
+            <label class="form-label" for="loanPeriodsInput">Número de pagos</label>
             <input type="number" id="loanPeriodsInput" class="form-input" min="1" max="36" step="1" value="4" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="loanFrequencySelect">Frecuencia de Cuotas</label>
+            <label class="form-label" for="loanFrequencySelect">¿Cada cuánto paga?</label>
             <select id="loanFrequencySelect" class="form-select">
-              <option value="WEEKLY">Semanal</option>
-              <option value="BIWEEKLY">Quincenal</option>
-              <option value="MONTHLY">Mensual</option>
+              <option value="WEEKLY">Cada semana</option>
+              <option value="BIWEEKLY">Cada quincena</option>
+              <option value="MONTHLY">Cada mes</option>
             </select>
           </div>
           <div class="form-group full">
-            <label class="form-label" for="loanDisburseSelect">Modalidad de Entrega del Dinero</label>
+            <label class="form-label" for="loanDisburseSelect">¿Cómo se entrega el dinero?</label>
             <select id="loanDisburseSelect" class="form-select">
-              <option value="DIRECT_PURCHASE">Compra directa pagada por Papás (No suma efectivo a la alcancía, solo registra el crédito)</option>
-              <option value="DEPOSIT_TO_PIGGY">Depositar el dinero prestado en el Saldo Disponible de la alcancía</option>
+              <option value="DIRECT_PURCHASE">Papás compraron el artículo directo (Solo anotar deuda)</option>
+              <option value="DEPOSIT_TO_PIGGY">Meter el dinero prestado a la alcancía disponible</option>
             </select>
           </div>
         </div>
@@ -828,19 +868,19 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogLoan">Cancelar</button>
-          <button type="submit" class="btn btn-loan">Otorgar Crédito y Generar Tabla</button>
+          <button type="submit" class="btn btn-loan">Guardar Préstamo</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- 5. Modal para Abono Extraordinario a Capital en Crédito -->
+  <!-- 5. Modal para Adelantar Pago de Préstamo -->
   <dialog class="app-dialog" id="dialogExtraPrincipal">
     <div class="dialog-inner">
       <div class="dialog-header">
         <h3 class="dialog-title inline-icon-text">
           <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Abono Extraordinario a Capital
+          Adelantar Pago para Pagar Menos Intereses
         </h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogExtraPrincipal" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -849,36 +889,36 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       <form id="formExtraPrincipal">
         <input type="hidden" id="extraLoanIdInput" />
         <p style="font-size: 0.86rem; color: var(--text-secondary); margin-top: 0;">
-          Un abono directo a capital reduce la deuda base de inmediato y <strong>recalcula a la baja los intereses futuros</strong> de las cuotas pendientes.
+          Si das un pago adelantado hoy, tu deuda baja de inmediato y <strong>pagarás menos intereses</strong> en los pagos que faltan.
         </p>
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="extraAmountInput">Monto a Abonar a Capital ($)</label>
+            <label class="form-label" for="extraAmountInput">¿Cuánto quieres adelantar? ($)</label>
             <input type="number" id="extraAmountInput" class="form-input" min="1" step="0.5" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="extraSourceSelect">Origen de los Fondos</label>
+            <label class="form-label" for="extraSourceSelect">¿Con qué se paga?</label>
             <select id="extraSourceSelect" class="form-select">
-              <option value="PIGGY">Descontar del Saldo Disponible de la Alcancía</option>
-              <option value="EXTERNAL">Pago con Efectivo Externo / Tareas Extra</option>
+              <option value="PIGGY">Usar dinero disponible de mi Alcancía</option>
+              <option value="EXTERNAL">Con dinero en efectivo o tareas extra</option>
             </select>
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogExtraPrincipal">Cancelar</button>
-          <button type="submit" class="btn btn-loan">Aplicar Abono y Recalcular Intereses</button>
+          <button type="submit" class="btn btn-loan">Hacer Pago Adelantado</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- 6. Modal para Invertir a Plazo Fijo con Rendimientos -->
+  <!-- 6. Modal para Guardar Dinero a Plazo con Ganancia -->
   <dialog class="app-dialog" id="dialogInvestment">
     <div class="dialog-inner">
       <div class="dialog-header">
         <h3 class="dialog-title inline-icon-text">
           <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-          Crear Inversión a Plazo con Rendimientos
+          Guardar Dinero a Plazo para Ganar Extra
         </h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogInvestment" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -887,23 +927,23 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       <form id="formInvestment">
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="invChildSelect">Alcancía del Hijo/a</label>
+            <label class="form-label" for="invChildSelect">Alcancía de:</label>
             <select id="invChildSelect" class="form-select" required></select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="invPrincipalInput">Monto a Invertir del Saldo Disponible ($)</label>
+            <label class="form-label" for="invPrincipalInput">Cantidad a guardar ($)</label>
             <input type="number" id="invPrincipalInput" class="form-input" min="10" step="1" value="250" required />
           </div>
           <div class="form-group full">
-            <label class="form-label" for="invTitleInput">Nombre del Pagaré / Meta de Inversión</label>
-            <input type="text" id="invTitleInput" class="form-input" placeholder="Ej. Pagaré Super-Ahorro 30 Días" required />
+            <label class="form-label" for="invTitleInput">Nombre de este ahorro</label>
+            <input type="text" id="invTitleInput" class="form-input" placeholder="Ej. Ahorro de 30 días para mi meta" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="invTermDaysInput">Plazo en Días</label>
+            <label class="form-label" for="invTermDaysInput">¿Por cuántos días se guarda?</label>
             <input type="number" id="invTermDaysInput" class="form-input" min="1" max="365" value="30" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="invYieldRateInput">Tasa de Rendimiento del Plazo (%)</label>
+            <label class="form-label" for="invYieldRateInput">Premio / Ganancia al terminar (%)</label>
             <input type="number" id="invYieldRateInput" class="form-input" min="0.5" max="100" step="0.5" value="10" required />
           </div>
         </div>
@@ -912,19 +952,19 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogInvestment">Cancelar</button>
-          <button type="submit" class="btn btn-invest">Congelar Saldo e Iniciar Plazo Fijo</button>
+          <button type="submit" class="btn btn-invest">Empezar Ahorro a Plazo</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- 7. Modal para Crear/Editar Usuarios (Papás e Hijos) -->
+  <!-- 7. Modal para Agregar Integrante -->
   <dialog class="app-dialog" id="dialogMember">
     <div class="dialog-inner">
       <div class="dialog-header">
         <h3 class="dialog-title inline-icon-text">
           <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Definir Usuario Familiar (Papá o Hijo)
+          Agregar Integrante de la Familia
         </h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogMember" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -933,10 +973,10 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       <form id="formMember">
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="memRoleSelect">Nivel de Usuario</label>
+            <label class="form-label" for="memRoleSelect">¿Quién es?</label>
             <select id="memRoleSelect" class="form-select">
-              <option value="CHILD">HIJO/A (Solo lectura + Alcancía personal)</option>
-              <option value="PARENT">PAPÁ/MAMÁ (Acceso a modificación de datos)</option>
+              <option value="CHILD">Hijo / Hija (Con su propia alcancía)</option>
+              <option value="PARENT">Papá / Mamá (Puede hacer cambios)</option>
             </select>
           </div>
           <div class="form-group">
@@ -944,44 +984,44 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
             <input type="text" id="memNameInput" class="form-input" placeholder="Ej. Lucas / Mamá Laura" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="memAvatarSelect">Icono SVG de Perfil</label>
+            <label class="form-label" for="memAvatarSelect">Icono</label>
             <select id="memAvatarSelect" class="form-select">
-              <option value="unicorn">Unicornio (SVG)</option>
-              <option value="rocket">Cohete Espacial (SVG)</option>
-              <option value="dino">Dinosaurio (SVG)</option>
-              <option value="soccer">Balón Deportivo (SVG)</option>
-              <option value="palette">Paleta de Arte (SVG)</option>
-              <option value="guitar">Guitarra Musical (SVG)</option>
-              <option value="parent-male">Perfil Papá (SVG)</option>
-              <option value="parent-female">Perfil Mamá (SVG)</option>
+              <option value="unicorn">Unicornio</option>
+              <option value="rocket">Cohete Espacial</option>
+              <option value="dino">Dinosaurio</option>
+              <option value="soccer">Deporte / Balón</option>
+              <option value="palette">Arte y Pintura</option>
+              <option value="guitar">Música / Guitarra</option>
+              <option value="parent-male">Papá</option>
+              <option value="parent-female">Mamá</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label" for="memAgeInput">Edad (Hijos) / Título (Papás)</label>
+            <label class="form-label" for="memAgeInput">Edad (Hijos) o Rol (Papás)</label>
             <input type="text" id="memAgeInput" class="form-input" placeholder="Ej. 11" value="10" />
           </div>
           <div class="form-group" id="memGoalTitleGroup">
-            <label class="form-label" for="memGoalTitleInput">Meta de Ahorro (Hijos)</label>
-            <input type="text" id="memGoalTitleInput" class="form-input" placeholder="Ej. Patines Nuevos" value="Meta de Ahorro" />
+            <label class="form-label" for="memGoalTitleInput">¿Qué quiere comprar con su ahorro?</label>
+            <input type="text" id="memGoalTitleInput" class="form-input" placeholder="Ej. Patines Nuevos" value="Mi Meta de Ahorro" />
           </div>
           <div class="form-group" id="memGoalAmountGroup">
-            <label class="form-label" for="memGoalAmountInput">Monto de la Meta ($)</label>
+            <label class="form-label" for="memGoalAmountInput">¿Cuánto cuesta esa meta? ($)</label>
             <input type="number" id="memGoalAmountInput" class="form-input" min="50" step="10" value="1500" />
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogMember">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+          <button type="submit" class="btn btn-primary">Guardar Integrante</button>
         </div>
       </form>
     </div>
   </dialog>
 
-  <!-- 8. Modal para Crear Fuente de Ingreso o Categoría de Gasto -->
+  <!-- 8. Modal para Agregar Forma de Ganar o Tipo de Gasto -->
   <dialog class="app-dialog" id="dialogCatalog">
     <div class="dialog-inner">
       <div class="dialog-header">
-        <h3 class="dialog-title inline-icon-text" id="dialogCatalogTitle">Definir Fuente o Categoría</h3>
+        <h3 class="dialog-title inline-icon-text" id="dialogCatalogTitle">Agregar Categoría</h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogCatalog" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -991,32 +1031,32 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label" for="catNameInput">Nombre</label>
-            <input type="text" id="catNameInput" class="form-input" placeholder="Ej. Paseo de Mascotas / Cine" required />
+            <input type="text" id="catNameInput" class="form-input" placeholder="Ej. Pasear al perro / Cine" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="catIconSelect">Icono Vectorial SVG</label>
+            <label class="form-label" for="catIconSelect">Icono</label>
             <select id="catIconSelect" class="form-select">
-              <option value="coins">Monedas (SVG)</option>
-              <option value="calendar">Calendario / Mesada (SVG)</option>
-              <option value="sparkles">Tareas del Hogar (SVG)</option>
-              <option value="trophy">Trofeo / Calificaciones (SVG)</option>
-              <option value="gift">Regalo Familiar (SVG)</option>
-              <option value="puzzle">Juguetes y Creatividad (SVG)</option>
-              <option value="gamepad">Videojuegos (SVG)</option>
-              <option value="icecream">Dulces y Snacks (SVG)</option>
-              <option value="book">Libros y Educación (SVG)</option>
-              <option value="popcorn">Cine y Salidas (SVG)</option>
-              <option value="bike">Deporte y Bicicleta (SVG)</option>
+              <option value="coins">Monedas</option>
+              <option value="calendar">Calendario / Mesada</option>
+              <option value="sparkles">Tareas de Casa</option>
+              <option value="trophy">Premio / Buenas Notas</option>
+              <option value="gift">Regalo</option>
+              <option value="puzzle">Juguetes</option>
+              <option value="gamepad">Videojuegos</option>
+              <option value="icecream">Dulces y Helados</option>
+              <option value="book">Libros</option>
+              <option value="popcorn">Cine y Salidas</option>
+              <option value="bike">Deporte</option>
             </select>
           </div>
           <div class="form-group full">
-            <label class="form-label" for="catDescInput">Descripción</label>
-            <input type="text" id="catDescInput" class="form-input" placeholder="Descripción breve para los hijos" required />
+            <label class="form-label" for="catDescInput">Explicación corta</label>
+            <input type="text" id="catDescInput" class="form-input" placeholder="¿Para qué sirve esta categoría?" required />
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
           <button type="button" class="btn btn-ghost" data-close-dialog="dialogCatalog">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar en Catálogo</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
         </div>
       </form>
     </div>
@@ -1028,7 +1068,7 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       <div class="dialog-header">
         <h3 class="dialog-title inline-icon-text">
           <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Instalar SmartPiggy en tu Dispositivo
+          Instalar SmartPiggy en tu Celular o PC
         </h3>
         <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogInstallPwa" aria-label="Cerrar">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1036,33 +1076,33 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       </div>
       <div style="font-size: 0.88rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.9rem;">
         <p style="margin: 0;">
-          Instala <strong>SmartPiggy Cloud</strong> como una aplicación nativa a pantalla completa en tu celular, tablet o computadora:
+          Puedes instalar <strong>SmartPiggy Cloud</strong> en tu pantalla de inicio para abrirla como aplicación:
         </p>
 
         <div id="nativeInstallPromptSection" style="display: none; background: var(--color-income-bg); border: 1px solid var(--color-income); padding: 0.9rem; border-radius: var(--radius-md);">
           <p style="margin: 0 0 0.6rem 0; color: var(--text-primary); font-weight: 700;">
-            Tu navegador permite instalación directa en 1 clic:
+            Instalación rápida en 1 toque:
           </p>
           <button type="button" class="btn btn-income" id="btnTriggerNativeInstall" style="width: 100%;">
             <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Instalar Aplicación Ahora
+            Instalar Ahora
           </button>
         </div>
 
         <div style="background: var(--bg-elevated); padding: 0.9rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-          <strong style="color: var(--text-primary); display: block; margin-bottom: 0.35rem;">En Android (Chrome / Edge / Samsung Internet):</strong>
-          1. Toca el menú de 3 puntos <strong>(⋮)</strong> arriba a la derecha.<br />
-          2. Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.
+          <strong style="color: var(--text-primary); display: block; margin-bottom: 0.35rem;">En Android (Chrome / Edge / Samsung):</strong>
+          1. Toca los 3 puntos <strong>(⋮)</strong> arriba a la derecha.<br />
+          2. Elige <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.
         </div>
 
         <div style="background: var(--bg-elevated); padding: 0.9rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
           <strong style="color: var(--text-primary); display: block; margin-bottom: 0.35rem;">En iPhone / iPad (Safari):</strong>
-          1. Toca el botón <strong>Compartir</strong> (cuadro con flecha hacia arriba en la barra inferior).<br />
-          2. Desliza hacia abajo y toca <strong>"Agregar a inicio"</strong> (Add to Home Screen).
+          1. Toca el botón <strong>Compartir</strong> en la barra de abajo.<br />
+          2. Toca <strong>"Agregar a inicio"</strong>.
         </div>
 
         <div style="display: flex; justify-content: flex-end;">
-          <button type="button" class="btn btn-primary" data-close-dialog="dialogInstallPwa">Entendido</button>
+          <button type="button" class="btn btn-primary" data-close-dialog="dialogInstallPwa">Listo</button>
         </div>
       </div>
     </div>
