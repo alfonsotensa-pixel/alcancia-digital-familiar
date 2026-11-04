@@ -31,15 +31,15 @@ import {
   findDueDeterministicAutomations
 } from './financial-engine.js';
 
-import { CloudSyncManager, mergeFamilyCRDT } from './cloud-sync.js';
+import { CloudSyncManager, mergeFamilyCRDT, stripLegacyDemoData } from './cloud-sync.js';
 import { buildInitialSignedFamilyState } from './seed-data.js';
 
 class SmartPiggyApp {
   constructor() {
     this.state = null;
-    this.selectedChildId = 'child_sofia';
+    this.selectedChildId = 'child_principal';
     this.currentRole = 'CHILD'; // 'CHILD' (Solo lectura por defecto) | 'PARENT' (Administración firmada)
-    this.activeParentId = 'parent_carlos';
+    this.activeParentId = 'parent_admin';
     this.parentSigningKey = null; // Clave HMAC-SHA256 solo en memoria RAM durante sesión Parental
     this.inactivityTimer = null;
     this.auditResult = { validEvents: [], corruptedEvents: [], isClean: true };
@@ -86,9 +86,9 @@ class SmartPiggyApp {
     let loaded = this.cloudManager.loadLocalState(this.cloudManager.familyCode);
     if (!loaded || !loaded.family) {
       loaded = await buildInitialSignedFamilyState(this.cloudManager.familyCode);
-      this.cloudManager.saveLocalState(loaded);
     }
-    this.state = loaded;
+    this.state = stripLegacyDemoData(loaded);
+    this.cloudManager.saveLocalState(this.state);
 
     // Normalizar cualquier clave de icono previa al estándar SVG
     this.normalizeLegacyIconsToSvg();
@@ -96,6 +96,10 @@ class SmartPiggyApp {
     const children = this.getChildren();
     if (children.length > 0 && !children.some((c) => c.id === this.selectedChildId)) {
       this.selectedChildId = children[0].id;
+    }
+    const parents = this.getParents();
+    if (parents.length > 0 && !parents.some((p) => p.id === this.activeParentId)) {
+      this.activeParentId = parents[0].id;
     }
 
     this.bindEvents();
@@ -279,14 +283,51 @@ class SmartPiggyApp {
     this.renderAll();
   }
 
-  ensureParentPermission() {
+  ensureParentPermission(afterUnlockCallback = null) {
     if (this.currentRole !== 'PARENT' || !this.parentSigningKey) {
-      this.showToast('Pide a Papá o Mamá que ponga su PIN para guardar cambios.', 'warn');
+      if (typeof afterUnlockCallback === 'function') {
+        this.pendingAfterPinAction = afterUnlockCallback;
+      }
+      this.showToast('Escribe el PIN de Papá o Mamá para continuar (PIN inicial: 1234).', 'info');
       this.openParentPinDialog();
       return false;
     }
     this.resetParentInactivityTimer();
     return true;
+  }
+
+  async runAsParent(actionFn) {
+    if (!this.ensureParentPermission(actionFn)) return;
+    await actionFn();
+  }
+
+  markDeletedId(id) {
+    if (!id || !this.state?.family) return;
+    this.state.family.deletedIds = this.state.family.deletedIds || {};
+    this.state.family.deletedIds[id] = new Date().toISOString();
+    this.state.family.updatedAt = new Date().toISOString();
+  }
+
+  async reSignLedgerChain() {
+    if (!this.parentSigningKey || !this.state) return;
+    const reSigned = [];
+    let prevHash = 'GENESIS';
+    const nowIso = new Date().toISOString();
+    for (const ev of this.state.ledgerEvents || []) {
+      const signed = await createSignedLedgerEvent(
+        {
+          ...ev,
+          updatedAt: nowIso
+        },
+        this.parentSigningKey,
+        this.state.family.saltHex,
+        prevHash
+      );
+      signed.updatedAt = nowIso;
+      prevHash = signed.eventHash;
+      reSigned.push(signed);
+    }
+    this.state.ledgerEvents = reSigned;
   }
 
   resetParentInactivityTimer() {
@@ -334,18 +375,18 @@ class SmartPiggyApp {
     }
     this.currentRole = 'PARENT';
     this.parentSigningKey = signingKey;
-    this.activeParentId = selectedParentId || this.getParents()[0]?.id || 'parent_carlos';
+    this.activeParentId = selectedParentId || this.getParents()[0]?.id || 'parent_admin';
     document.body.setAttribute('data-role', 'PARENT');
     this.resetParentInactivityTimer();
 
     await this.consolidateDueAutomationsAsParent(true);
     await this.runLedgerAuditAndRender();
-    this.showToast('¡Modo Papá activado! Ya puedes añadir movimientos o aprobar pedidos.', 'success');
+    this.showToast('¡Modo Papá activado! Ya puedes añadir, modificar, borrar o aprobar pedidos.', 'success');
 
     if (typeof this.pendingAfterPinAction === 'function') {
       const nextFn = this.pendingAfterPinAction;
       this.pendingAfterPinAction = null;
-      setTimeout(() => nextFn(), 80);
+      setTimeout(() => nextFn(), 60);
     }
     return true;
   }
@@ -596,14 +637,19 @@ class SmartPiggyApp {
 
     goalEl.innerHTML = `
       <div style="flex: 1; min-width: 260px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.45rem;">
           <span class="inline-icon-text" style="font-weight: 800; font-size: 0.95rem;">
             <span style="color: var(--color-income); display: flex;">${renderSvgIcon(child.goalIcon || 'target', 20)}</span>
-            Meta de ${child.name}: <span style="color: var(--color-income);">${child.goalTitle || 'Mi Gran Meta'}</span>
+            Meta de ${child.name}: <span style="color: var(--color-income);">${child.goalTitle || 'Mi Primera Meta de Ahorro'}</span>
           </span>
-          <span style="font-family: var(--font-mono); font-weight: 800; font-size: 0.9rem;">
-            ${formatMoneyCents(currentProgressCents, currency)} de ${formatMoneyCents(targetCents, currency)} (${pct}%)
-          </span>
+          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+            <span style="font-family: var(--font-mono); font-weight: 800; font-size: 0.9rem;">
+              ${formatMoneyCents(currentProgressCents, currency)} de ${formatMoneyCents(targetCents, currency)} (${pct}%)
+            </span>
+            <button type="button" class="btn btn-ghost btn-sm" data-edit-member="${child.id}" title="Cambiar nombre o meta de ${child.name}">
+              ${renderSvgIcon('edit', 14)} Editar Perfil / Meta
+            </button>
+          </div>
         </div>
         <div class="progress-track">
           <div class="progress-fill" style="width: ${pct}%;"></div>
@@ -662,17 +708,26 @@ class SmartPiggyApp {
     }
 
     const pendingReqs = (this.state.childRequests || []).filter((r) => r.status === 'PENDING');
-    if (pendingReqs.length > 0 && this.currentRole === 'PARENT') {
+    if (pendingReqs.length > 0) {
+      const firstReq = pendingReqs[0];
       banners.push(`
         <div class="notice-banner warning">
           <div class="inline-icon-text">
             ${renderSvgIcon('inbox', 20)}
-            <span><strong>Tienes ${pendingReqs.length} pedido(s) nuevo(s) desde la Calculadora:</strong>
-            "${pendingReqs[0].title}"</span>
+            <span><strong>Pedido pendiente (${pendingReqs.length}):</strong>
+            "${firstReq.title}"</span>
           </div>
-          <button type="button" class="btn btn-sm btn-warn" data-switch-tab="tab-sandbox">
-            ${renderSvgIcon('check', 15)} Ver y Aprobar Pedido
-          </button>
+          <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-income" data-approve-request="${firstReq.id}">
+              ${renderSvgIcon('check', 15)} Aprobar Pedido Ahora
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" data-reject-request="${firstReq.id}">
+              ${renderSvgIcon('x', 15)} Rechazar
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" data-switch-tab="tab-sandbox">
+              Ver en Calculadora
+            </button>
+          </div>
         </div>
       `);
     }
@@ -692,7 +747,7 @@ class SmartPiggyApp {
     });
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">Aún no hay movimientos aquí.</p>`;
+      listEl.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">Aún no hay movimientos aquí. Usa el botón <strong>+ Añadir Movimiento</strong> para empezar.</p>`;
     } else {
       listEl.innerHTML = filtered
         .map((ev) => {
@@ -725,7 +780,6 @@ class SmartPiggyApp {
             typeBadge = 'Movimiento Deshecho';
           }
 
-          const canReverse = this.currentRole === 'PARENT' && !ev.isReversed && ev.type !== 'REVERSAL';
           const iconSvg = renderSvgIcon(cat?.icon || fallbackIcon, 20);
 
           return `
@@ -744,7 +798,7 @@ class SmartPiggyApp {
                   </p>
                 </div>
               </div>
-              <div class="tx-right">
+              <div class="tx-right" style="flex-wrap: wrap; justify-content: flex-end;">
                 <div>
                   <div class="tx-amount ${signClass}">
                     ${prefix}${formatMoneyCents(ev.amountCents, currency)}
@@ -753,13 +807,14 @@ class SmartPiggyApp {
                     Quedó: ${formatMoneyCents(ev.runningAvailableCents, currency)}
                   </div>
                 </div>
-                ${
-                  canReverse
-                    ? `<button type="button" class="btn btn-ghost btn-sm parent-only" data-reverse-tx="${ev.id}" title="Cancelar este movimiento y devolver el saldo a como estaba">
-                        ${renderSvgIcon('undo', 14)} Deshacer
-                      </button>`
-                    : ''
-                }
+                <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-ghost btn-sm" data-edit-tx="${ev.id}" title="Modificar este movimiento">
+                    ${renderSvgIcon('edit', 14)} Editar
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-delete-tx="${ev.id}" title="Borrar este movimiento" style="color: var(--color-expense);">
+                    ${renderSvgIcon('trash', 14)} Borrar
+                  </button>
+                </div>
               </div>
             </div>
           `;
@@ -872,12 +927,18 @@ class SmartPiggyApp {
                 }
               </span>
             </div>
-            <div class="parent-only" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
               <button type="button" class="btn btn-income btn-sm" data-trigger-recurring="${rule.id}">
-                ${renderSvgIcon('zap', 14)} Depositar Mesada Hoy
+                ${renderSvgIcon('zap', 14)} Depositar Hoy
               </button>
               <button type="button" class="btn btn-ghost btn-sm" data-toggle-recurring="${rule.id}">
-                ${rule.status === 'ACTIVE' ? `${renderSvgIcon('pause', 14)} Pausar` : `${renderSvgIcon('play', 14)} Volver a Activar`}
+                ${rule.status === 'ACTIVE' ? `${renderSvgIcon('pause', 14)} Pausar` : `${renderSvgIcon('play', 14)} Activar`}
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" data-edit-recurring="${rule.id}">
+                ${renderSvgIcon('edit', 14)} Editar
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" data-delete-recurring="${rule.id}" style="color: var(--color-expense);">
+                ${renderSvgIcon('trash', 14)} Borrar
               </button>
             </div>
           </div>
@@ -924,7 +985,7 @@ class SmartPiggyApp {
                 <td class="mono" style="font-weight: 700;">${formatMoneyCents(inst.totalInstallmentCents, currency)}</td>
                 <td class="mono" style="color: var(--color-income);">${formatMoneyCents(inst.paidCents || 0, currency)}</td>
                 <td>${stBadge}</td>
-                <td class="parent-only">
+                <td>
                   ${
                     inst.status !== 'PAID' && loan.status === 'ACTIVE'
                       ? `
@@ -963,14 +1024,20 @@ class SmartPiggyApp {
                   }
                 </p>
               </div>
-              <div class="parent-only" style="display: flex; gap: 0.5rem;">
+              <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
                 ${
                   loan.status === 'ACTIVE' && loan.remainingDebtCents > 0
                     ? `<button type="button" class="btn btn-primary btn-sm" data-open-extra-principal="${loan.id}">
-                        ${renderSvgIcon('zap', 14)} Adelantar Pago (Ahorrar Intereses)
+                        ${renderSvgIcon('zap', 14)} Adelantar Pago
                       </button>`
                     : ''
                 }
+                <button type="button" class="btn btn-ghost btn-sm" data-edit-loan="${loan.id}">
+                  ${renderSvgIcon('edit', 14)} Editar
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" data-delete-loan="${loan.id}" style="color: var(--color-expense);">
+                  ${renderSvgIcon('trash', 14)} Borrar
+                </button>
               </div>
             </div>
 
@@ -989,7 +1056,7 @@ class SmartPiggyApp {
                     <th>Total del Pago</th>
                     <th>Ya Pagado</th>
                     <th>Estado</th>
-                    <th class="parent-only">Pagar (Papá/Mamá)</th>
+                    <th>Pagar (Papá/Mamá)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1056,20 +1123,26 @@ class SmartPiggyApp {
               <span>Empezó: <strong>${inv.startDate}</strong> · Termina: <strong>${inv.maturityDate}</strong> (${inv.status === 'ACTIVE' ? `Faltan ${inv.remainingDays} días` : 'Listo'})</span>
             </p>
 
-            ${
-              inv.status === 'ACTIVE'
-                ? `
-                  <div class="parent-only" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+              ${
+                inv.status === 'ACTIVE'
+                  ? `
                     <button type="button" class="btn btn-income btn-sm" data-mature-investment="${inv.id}" title="Entregar el dinero guardado más su ganancia completa a la alcancía">
-                      ${renderSvgIcon('check', 14)} Entregar Dinero + Ganancia (+${formatMoneyCents(inv.expectedInterestCents, currency)})
+                      ${renderSvgIcon('check', 14)} Entregar + Ganancia (+${formatMoneyCents(inv.expectedInterestCents, currency)})
                     </button>
                     <button type="button" class="btn btn-ghost btn-sm" data-early-exit-investment="${inv.id}" title="Sacar el dinero antes de tiempo sin ganancia extra">
-                      ${renderSvgIcon('stop', 14)} Sacar Antes (Sin Ganancia)
+                      ${renderSvgIcon('stop', 14)} Sacar Antes
                     </button>
-                  </div>
-                `
-                : ''
-            }
+                  `
+                  : ''
+              }
+              <button type="button" class="btn btn-ghost btn-sm" data-edit-investment="${inv.id}">
+                ${renderSvgIcon('edit', 14)} Editar
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" data-delete-investment="${inv.id}" style="color: var(--color-expense);">
+                ${renderSvgIcon('trash', 14)} Borrar
+              </button>
+            </div>
           </div>
         `;
       })
@@ -1083,7 +1156,7 @@ class SmartPiggyApp {
         const isParent = m.role === 'PARENT';
         return `
           <div class="panel-card" style="margin-bottom: 0; background: var(--bg-elevated);">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 0.8rem;">
                 <div class="tx-icon" style="color: ${m.themeColor || 'var(--accent-parent)'};">
                   ${renderSvgIcon(m.avatar || (isParent ? 'parent-male' : 'unicorn'), 22)}
@@ -1095,11 +1168,19 @@ class SmartPiggyApp {
                   </span>
                 </div>
               </div>
-              ${
-                !isParent
-                  ? `<button type="button" class="btn btn-ghost btn-sm" data-select-child="${m.id}">Ver Alcancía</button>`
-                  : ''
-              }
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                ${
+                  !isParent
+                    ? `<button type="button" class="btn btn-ghost btn-sm" data-select-child="${m.id}">Ver Alcancía</button>`
+                    : ''
+                }
+                <button type="button" class="btn btn-ghost btn-sm" data-edit-member="${m.id}" title="Modificar integrante">
+                  ${renderSvgIcon('edit', 14)} Editar
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" data-delete-member="${m.id}" title="Borrar integrante" style="color: var(--color-expense);">
+                  ${renderSvgIcon('trash', 14)} Borrar
+                </button>
+              </div>
             </div>
             ${
               !isParent
@@ -1129,7 +1210,14 @@ class SmartPiggyApp {
               <p class="tx-sub">${c.description || 'De dónde llega el dinero'}</p>
             </div>
           </div>
-          <span class="badge badge-success">Entrada de Dinero</span>
+          <div class="tx-right" style="gap: 0.35rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-ghost btn-sm" data-edit-catalog="${c.id}">
+              ${renderSvgIcon('edit', 14)} Editar
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" data-delete-catalog="${c.id}" style="color: var(--color-expense);">
+              ${renderSvgIcon('trash', 14)} Borrar
+            </button>
+          </div>
         </div>
       `
       )
@@ -1147,7 +1235,14 @@ class SmartPiggyApp {
               <p class="tx-sub">${c.description || 'Tipo de gasto'}</p>
             </div>
           </div>
-          <span class="badge badge-danger">Tipo de Gasto</span>
+          <div class="tx-right" style="gap: 0.35rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-ghost btn-sm" data-edit-catalog="${c.id}">
+              ${renderSvgIcon('edit', 14)} Editar
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" data-delete-catalog="${c.id}" style="color: var(--color-expense);">
+              ${renderSvgIcon('trash', 14)} Borrar
+            </button>
+          </div>
         </div>
       `
       )
@@ -1182,20 +1277,23 @@ class SmartPiggyApp {
                 <p class="tx-sub">${r.note || ''}</p>
               </div>
             </div>
-            <div class="tx-right">
+            <div class="tx-right" style="flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem;">
               ${stBadge}
               ${
-                r.status === 'PENDING' && this.currentRole === 'PARENT'
+                r.status === 'PENDING'
                   ? `
-                    <button type="button" class="btn btn-income btn-sm parent-only" data-approve-request="${r.id}">
-                      ${renderSvgIcon('check', 14)} Aceptar Pedido
+                    <button type="button" class="btn btn-income btn-sm" data-approve-request="${r.id}">
+                      ${renderSvgIcon('check', 14)} Aprobar Pedido
                     </button>
-                    <button type="button" class="btn btn-ghost btn-sm parent-only" data-reject-request="${r.id}">
+                    <button type="button" class="btn btn-ghost btn-sm" data-reject-request="${r.id}">
                       ${renderSvgIcon('x', 14)} No por ahora
                     </button>
                   `
                   : ''
               }
+              <button type="button" class="btn btn-ghost btn-sm" data-delete-request="${r.id}" style="color: var(--color-expense);" title="Borrar este pedido">
+                ${renderSvgIcon('trash', 14)} Borrar
+              </button>
             </div>
           </div>
         `;
@@ -1412,15 +1510,28 @@ class SmartPiggyApp {
     }
   }
 
-  openTransactionDialog(mode = 'INCOME') {
-    if (!this.ensureParentPermission()) return;
-    this.setTransactionModalMode(mode);
-    document.getElementById('txDateInput').value = getTodayLocalDate();
-    document.getElementById('txAmountInput').value = '';
-    document.getElementById('txNoteInput').value = '';
+  openTransactionDialog(mode = 'INCOME', editTx = null) {
+    this.runAsParent(() => {
+      this.setTransactionModalMode(mode);
+      const editInput = document.getElementById('txEditIdInput');
+      if (editTx) {
+        if (editInput) editInput.value = editTx.id;
+        document.getElementById('dialogTxTitle').innerHTML = `${renderSvgIcon('edit', 19)} Modificar Movimiento`;
+        document.getElementById('txChildSelect').value = editTx.memberId;
+        document.getElementById('txDateInput').value = editTx.localDate || getTodayLocalDate();
+        document.getElementById('txAmountInput').value = (Number(editTx.amountCents || 0) / 100).toFixed(2);
+        if (editTx.catalogId) document.getElementById('txCatalogSelect').value = editTx.catalogId;
+        document.getElementById('txNoteInput').value = editTx.note || '';
+      } else {
+        if (editInput) editInput.value = '';
+        document.getElementById('txDateInput').value = getTodayLocalDate();
+        document.getElementById('txAmountInput').value = '';
+        document.getElementById('txNoteInput').value = '';
+      }
 
-    const dialog = document.getElementById('dialogTransaction');
-    dialog?.showModal();
+      const dialog = document.getElementById('dialogTransaction');
+      dialog?.showModal();
+    });
   }
 
   populateCloudConfigInputs() {
@@ -1468,7 +1579,7 @@ class SmartPiggyApp {
         document.getElementById('dialogParentPin')?.close();
       } else {
         const err = document.getElementById('pinErrorMsg');
-        err.innerHTML = `${renderSvgIcon('alert-triangle', 15)} PIN incorrecto. (El PIN demostrativo inicial es 1234).`;
+        err.innerHTML = `${renderSvgIcon('alert-triangle', 15)} PIN incorrecto. (El PIN inicial es 1234).`;
         err.style.display = 'block';
       }
     });
@@ -1514,13 +1625,7 @@ class SmartPiggyApp {
 
     // Botón flotante fijo (+ Añadir Movimiento) accesible desde cualquier ventana
     document.getElementById('fabAddMovement')?.addEventListener('click', () => {
-      if (this.currentRole === 'PARENT' && this.parentSigningKey) {
-        this.openTransactionDialog('INCOME');
-      } else {
-        this.pendingAfterPinAction = () => this.openTransactionDialog('INCOME');
-        this.showToast('Pide a Papá o Mamá que ponga su PIN para añadir el movimiento.', 'info');
-        this.openParentPinDialog();
-      }
+      this.openTransactionDialog('INCOME');
     });
 
     // Selector rápido dentro del modal (+ Meter Dinero / - Gasté Dinero)
@@ -1534,24 +1639,10 @@ class SmartPiggyApp {
     document.getElementById('btnOpenRecurringModal')?.addEventListener('click', () => this.openRecurringDialog());
     document.getElementById('btnOpenLoanModal')?.addEventListener('click', () => this.openLoanDialog());
     document.getElementById('btnOpenInvestmentModal')?.addEventListener('click', () => this.openInvestmentDialog());
-    document.getElementById('btnOpenMemberModal')?.addEventListener('click', () => {
-      if (!this.ensureParentPermission()) return;
-      document.getElementById('dialogMember')?.showModal();
-    });
+    document.getElementById('btnOpenMemberModal')?.addEventListener('click', () => this.openMemberDialog());
 
-    document.getElementById('btnAddIncomeSource')?.addEventListener('click', () => {
-      if (!this.ensureParentPermission()) return;
-      document.getElementById('catTypeInput').value = 'INCOME_SOURCE';
-      document.getElementById('dialogCatalogTitle').innerHTML = `${renderSvgIcon('arrow-down-left', 19)} Agregar Entrada de Dinero`;
-      document.getElementById('dialogCatalog')?.showModal();
-    });
-
-    document.getElementById('btnAddExpenseCategory')?.addEventListener('click', () => {
-      if (!this.ensureParentPermission()) return;
-      document.getElementById('catTypeInput').value = 'EXPENSE_CATEGORY';
-      document.getElementById('dialogCatalogTitle').innerHTML = `${renderSvgIcon('arrow-up-right', 19)} Agregar Tipo de Gasto`;
-      document.getElementById('dialogCatalog')?.showModal();
-    });
+    document.getElementById('btnAddIncomeSource')?.addEventListener('click', () => this.openCatalogDialog('INCOME_SOURCE'));
+    document.getElementById('btnAddExpenseCategory')?.addEventListener('click', () => this.openCatalogDialog('EXPENSE_CATEGORY'));
 
     document.body.addEventListener('click', async (e) => {
       const childBtn = e.target.closest('[data-select-child]');
@@ -1571,9 +1662,11 @@ class SmartPiggyApp {
       if (actionBtn) {
         const act = actionBtn.getAttribute('data-action');
         if (act === 'open-pin') this.openParentPinDialog();
-        if (act === 'consolidate-due' && this.ensureParentPermission()) {
-          await this.consolidateDueAutomationsAsParent(false);
-          await this.runLedgerAuditAndRender();
+        if (act === 'consolidate-due') {
+          await this.runAsParent(async () => {
+            await this.consolidateDueAutomationsAsParent(false);
+            await this.runLedgerAuditAndRender();
+          });
         }
         if (act === 'purge-corrupted') {
           await this.purgeCorruptedLedgerEntries();
@@ -1584,6 +1677,18 @@ class SmartPiggyApp {
       const revBtn = e.target.closest('[data-reverse-tx]');
       if (revBtn) {
         await this.handleReverseTransaction(revBtn.getAttribute('data-reverse-tx'));
+        return;
+      }
+
+      const editTxBtn = e.target.closest('[data-edit-tx]');
+      if (editTxBtn) {
+        this.openEditTransaction(editTxBtn.getAttribute('data-edit-tx'));
+        return;
+      }
+
+      const delTxBtn = e.target.closest('[data-delete-tx]');
+      if (delTxBtn) {
+        await this.handleDeleteTransaction(delTxBtn.getAttribute('data-delete-tx'));
         return;
       }
 
@@ -1599,6 +1704,18 @@ class SmartPiggyApp {
         return;
       }
 
+      const editRecBtn = e.target.closest('[data-edit-recurring]');
+      if (editRecBtn) {
+        this.openRecurringDialog(editRecBtn.getAttribute('data-edit-recurring'));
+        return;
+      }
+
+      const delRecBtn = e.target.closest('[data-delete-recurring]');
+      if (delRecBtn) {
+        await this.handleDeleteRecurring(delRecBtn.getAttribute('data-delete-recurring'));
+        return;
+      }
+
       const payInstBtn = e.target.closest('[data-pay-installment]');
       if (payInstBtn) {
         const [loanId, instNumStr, source] = payInstBtn.getAttribute('data-pay-installment').split(':');
@@ -1608,10 +1725,24 @@ class SmartPiggyApp {
 
       const extraBtn = e.target.closest('[data-open-extra-principal]');
       if (extraBtn) {
-        if (!this.ensureParentPermission()) return;
-        document.getElementById('extraLoanIdInput').value = extraBtn.getAttribute('data-open-extra-principal');
-        document.getElementById('extraAmountInput').value = '100';
-        document.getElementById('dialogExtraPrincipal')?.showModal();
+        const loanId = extraBtn.getAttribute('data-open-extra-principal');
+        this.runAsParent(() => {
+          document.getElementById('extraLoanIdInput').value = loanId;
+          document.getElementById('extraAmountInput').value = '100';
+          document.getElementById('dialogExtraPrincipal')?.showModal();
+        });
+        return;
+      }
+
+      const editLoanBtn = e.target.closest('[data-edit-loan]');
+      if (editLoanBtn) {
+        this.openLoanDialog(editLoanBtn.getAttribute('data-edit-loan'));
+        return;
+      }
+
+      const delLoanBtn = e.target.closest('[data-delete-loan]');
+      if (delLoanBtn) {
+        await this.handleDeleteLoan(delLoanBtn.getAttribute('data-delete-loan'));
         return;
       }
 
@@ -1627,6 +1758,42 @@ class SmartPiggyApp {
         return;
       }
 
+      const editInvBtn = e.target.closest('[data-edit-investment]');
+      if (editInvBtn) {
+        this.openInvestmentDialog(editInvBtn.getAttribute('data-edit-investment'));
+        return;
+      }
+
+      const delInvBtn = e.target.closest('[data-delete-investment]');
+      if (delInvBtn) {
+        await this.handleDeleteInvestment(delInvBtn.getAttribute('data-delete-investment'));
+        return;
+      }
+
+      const editMemBtn = e.target.closest('[data-edit-member]');
+      if (editMemBtn) {
+        this.openMemberDialog(editMemBtn.getAttribute('data-edit-member'));
+        return;
+      }
+
+      const delMemBtn = e.target.closest('[data-delete-member]');
+      if (delMemBtn) {
+        await this.handleDeleteMember(delMemBtn.getAttribute('data-delete-member'));
+        return;
+      }
+
+      const editCatBtn = e.target.closest('[data-edit-catalog]');
+      if (editCatBtn) {
+        this.openCatalogDialog(null, editCatBtn.getAttribute('data-edit-catalog'));
+        return;
+      }
+
+      const delCatBtn = e.target.closest('[data-delete-catalog]');
+      if (delCatBtn) {
+        await this.handleDeleteCatalog(delCatBtn.getAttribute('data-delete-catalog'));
+        return;
+      }
+
       const appReqBtn = e.target.closest('[data-approve-request]');
       if (appReqBtn) {
         await this.handleProcessChildRequest(appReqBtn.getAttribute('data-approve-request'), true);
@@ -1636,6 +1803,12 @@ class SmartPiggyApp {
       const rejReqBtn = e.target.closest('[data-reject-request]');
       if (rejReqBtn) {
         await this.handleProcessChildRequest(rejReqBtn.getAttribute('data-reject-request'), false);
+        return;
+      }
+
+      const delReqBtn = e.target.closest('[data-delete-request]');
+      if (delReqBtn) {
+        await this.handleDeleteChildRequest(delReqBtn.getAttribute('data-delete-request'));
         return;
       }
     });
@@ -1721,27 +1894,139 @@ class SmartPiggyApp {
     });
   }
 
-  openRecurringDialog() {
-    if (!this.ensureParentPermission()) return;
-    this.populateChildAndCatalogSelectors('INCOME');
-    document.getElementById('recNextDateInput').value = getTodayLocalDate();
-    document.getElementById('recTitleInput').value = '';
-    document.getElementById('recAmountInput').value = '150';
-    document.getElementById('dialogRecurring')?.showModal();
+  openEditTransaction(txId) {
+    const ev = (this.state.ledgerEvents || []).find((e) => e.id === txId);
+    if (!ev) return;
+    const mode = ev.type === 'EXPENSE' || ev.type === 'LOAN_PAYMENT' || ev.type === 'EXTRA_PRINCIPAL_PAYMENT' ? 'EXPENSE' : 'INCOME';
+    this.openTransactionDialog(mode, ev);
   }
 
-  openLoanDialog() {
-    if (!this.ensureParentPermission()) return;
-    this.populateChildAndCatalogSelectors('INCOME');
-    this.updateLoanModalPreview();
-    document.getElementById('dialogLoan')?.showModal();
+  openRecurringDialog(editRuleId = null) {
+    this.runAsParent(() => {
+      this.populateChildAndCatalogSelectors('INCOME');
+      const editInput = document.getElementById('recEditIdInput');
+      const rule = editRuleId ? (this.state.recurringRules || []).find((r) => r.id === editRuleId) : null;
+      if (rule) {
+        if (editInput) editInput.value = rule.id;
+        document.getElementById('dialogRecurringTitle').innerHTML = `${renderSvgIcon('edit', 19)} Modificar Mesada Programada`;
+        document.getElementById('recChildSelect').value = rule.memberId;
+        document.getElementById('recCatalogSelect').value = rule.catalogId;
+        document.getElementById('recTitleInput').value = rule.title || '';
+        document.getElementById('recAmountInput').value = (Number(rule.amountCents || 0) / 100).toFixed(2);
+        document.getElementById('recFrequencySelect').value = rule.frequency || 'WEEKLY';
+        document.getElementById('recNextDateInput').value = rule.nextExecutionDate || getTodayLocalDate();
+        document.getElementById('recAutoLoanSelect').value = rule.autoDeductLoanId || '';
+      } else {
+        if (editInput) editInput.value = '';
+        document.getElementById('dialogRecurringTitle').innerHTML = `${renderSvgIcon('calendar', 19)} Programar Mesada Automática`;
+        document.getElementById('recNextDateInput').value = getTodayLocalDate();
+        document.getElementById('recTitleInput').value = '';
+        document.getElementById('recAmountInput').value = '150';
+      }
+      document.getElementById('dialogRecurring')?.showModal();
+    });
   }
 
-  openInvestmentDialog() {
-    if (!this.ensureParentPermission()) return;
-    this.populateChildAndCatalogSelectors('INCOME');
-    this.updateInvestmentModalPreview();
-    document.getElementById('dialogInvestment')?.showModal();
+  openLoanDialog(editLoanId = null) {
+    this.runAsParent(() => {
+      this.populateChildAndCatalogSelectors('INCOME');
+      const editInput = document.getElementById('loanEditIdInput');
+      const loan = editLoanId ? (this.state.loans || []).find((l) => l.id === editLoanId) : null;
+      if (loan) {
+        if (editInput) editInput.value = loan.id;
+        document.getElementById('dialogLoanTitle').innerHTML = `${renderSvgIcon('edit', 19)} Modificar Préstamo`;
+        document.getElementById('loanChildSelect').value = loan.memberId;
+        document.getElementById('loanPrincipalInput').value = (Number(loan.principalCents || 0) / 100).toFixed(2);
+        document.getElementById('loanConceptInput').value = loan.concept || '';
+        document.getElementById('loanInterestType').value = loan.interestType || 'SIMPLE';
+        document.getElementById('loanRateInput').value = String(loan.interestRatePercent ?? 5);
+        document.getElementById('loanPeriodsInput').value = String(loan.termPeriods || 4);
+        document.getElementById('loanFrequencySelect').value = loan.frequency || 'WEEKLY';
+        document.getElementById('loanDisburseSelect').value = loan.disbursedToPiggy ? 'DEPOSIT_TO_PIGGY' : 'DIRECT_PURCHASE';
+      } else {
+        if (editInput) editInput.value = '';
+        document.getElementById('dialogLoanTitle').innerHTML = `${renderSvgIcon('credit-card', 19)} Nuevo Préstamo de Mamá/Papá`;
+        document.getElementById('loanPrincipalInput').value = '400';
+        document.getElementById('loanConceptInput').value = '';
+      }
+      this.updateLoanModalPreview();
+      document.getElementById('dialogLoan')?.showModal();
+    });
+  }
+
+  openInvestmentDialog(editInvId = null) {
+    this.runAsParent(() => {
+      this.populateChildAndCatalogSelectors('INCOME');
+      const editInput = document.getElementById('invEditIdInput');
+      const inv = editInvId ? (this.state.investments || []).find((i) => i.id === editInvId) : null;
+      if (inv) {
+        if (editInput) editInput.value = inv.id;
+        document.getElementById('dialogInvestmentTitle').innerHTML = `${renderSvgIcon('edit', 19)} Modificar Ahorro a Plazo`;
+        document.getElementById('invChildSelect').value = inv.memberId;
+        document.getElementById('invPrincipalInput').value = (Number(inv.principalCents || 0) / 100).toFixed(2);
+        document.getElementById('invTitleInput').value = inv.title || '';
+        document.getElementById('invTermDaysInput').value = String(inv.termDays || 30);
+        document.getElementById('invYieldRateInput').value = String(inv.yieldRatePercent || 10);
+      } else {
+        if (editInput) editInput.value = '';
+        document.getElementById('dialogInvestmentTitle').innerHTML = `${renderSvgIcon('trending-up', 19)} Guardar Dinero a Plazo para Ganar Más`;
+        document.getElementById('invPrincipalInput').value = '250';
+        document.getElementById('invTitleInput').value = '';
+      }
+      this.updateInvestmentModalPreview();
+      document.getElementById('dialogInvestment')?.showModal();
+    });
+  }
+
+  openMemberDialog(editMemberId = null) {
+    this.runAsParent(() => {
+      const editInput = document.getElementById('memEditIdInput');
+      const mem = editMemberId ? (this.state.members || []).find((m) => m.id === editMemberId) : null;
+      if (mem) {
+        if (editInput) editInput.value = mem.id;
+        document.getElementById('dialogMemberTitle').innerHTML = `${renderSvgIcon('edit', 19)} Modificar Integrante`;
+        document.getElementById('memRoleSelect').value = mem.role || 'CHILD';
+        document.getElementById('memNameInput').value = mem.name || '';
+        document.getElementById('memAvatarSelect').value = mem.avatar || 'piggy';
+        document.getElementById('memAgeInput').value = mem.role === 'CHILD' ? String(mem.age || 12) : (mem.title || 'Administrador Familiar');
+        document.getElementById('memGoalTitleInput').value = mem.goalTitle || '';
+        document.getElementById('memGoalAmountInput').value = ((mem.goalTargetCents || 100000) / 100).toFixed(2);
+      } else {
+        if (editInput) editInput.value = '';
+        document.getElementById('dialogMemberTitle').innerHTML = `${renderSvgIcon('users', 19)} Agregar Persona a la Familia`;
+        document.getElementById('memRoleSelect').value = 'CHILD';
+        document.getElementById('memNameInput').value = '';
+        document.getElementById('memAgeInput').value = '12';
+        document.getElementById('memGoalTitleInput').value = '';
+        document.getElementById('memGoalAmountInput').value = '1500';
+      }
+      document.getElementById('dialogMember')?.showModal();
+    });
+  }
+
+  openCatalogDialog(defaultType = 'INCOME_SOURCE', editCatId = null) {
+    this.runAsParent(() => {
+      const editInput = document.getElementById('catEditIdInput');
+      const cat = editCatId ? (this.state.catalogs || []).find((c) => c.id === editCatId) : null;
+      if (cat) {
+        if (editInput) editInput.value = cat.id;
+        document.getElementById('catTypeInput').value = cat.type;
+        document.getElementById('dialogCatalogTitle').innerHTML = `${renderSvgIcon('edit', 19)} Modificar Categoría`;
+        document.getElementById('catNameInput').value = cat.name || '';
+        document.getElementById('catIconSelect').value = cat.icon || 'coins';
+        document.getElementById('catDescInput').value = cat.description || '';
+      } else {
+        if (editInput) editInput.value = '';
+        document.getElementById('catTypeInput').value = defaultType;
+        document.getElementById('dialogCatalogTitle').innerHTML =
+          defaultType === 'INCOME_SOURCE'
+            ? `${renderSvgIcon('arrow-down-left', 19)} Agregar Entrada de Dinero`
+            : `${renderSvgIcon('arrow-up-right', 19)} Agregar Tipo de Gasto`;
+        document.getElementById('catNameInput').value = '';
+        document.getElementById('catDescInput').value = '';
+      }
+      document.getElementById('dialogCatalog')?.showModal();
+    });
   }
 
   /* ==========================================================================
@@ -1749,648 +2034,902 @@ class SmartPiggyApp {
      ========================================================================== */
 
   async submitTransactionForm() {
-    if (!this.ensureParentPermission()) return;
-    const mode = document.getElementById('txFormMode').value;
-    const memberId = document.getElementById('txChildSelect').value;
-    const amountCents = toCents(document.getElementById('txAmountInput').value);
-    const catalogId = document.getElementById('txCatalogSelect').value;
-    const localDate = document.getElementById('txDateInput').value || getTodayLocalDate();
-    const note = document.getElementById('txNoteInput').value.trim();
-    const overdraftPolicy = document.getElementById('txOverdraftPolicy').value;
+    await this.runAsParent(async () => {
+      const editId = (document.getElementById('txEditIdInput')?.value || '').trim();
+      const mode = document.getElementById('txFormMode').value;
+      const memberId = document.getElementById('txChildSelect').value;
+      const amountCents = toCents(document.getElementById('txAmountInput').value);
+      const catalogId = document.getElementById('txCatalogSelect').value;
+      const localDate = document.getElementById('txDateInput').value || getTodayLocalDate();
+      const note = document.getElementById('txNoteInput').value.trim();
+      const overdraftPolicy = document.getElementById('txOverdraftPolicy').value;
 
-    if (amountCents <= 0) {
-      this.showToast('Ingresa un monto mayor a $0.00', 'warn');
-      return;
-    }
-
-    const childState = reduceMemberFinancialState({
-      memberId,
-      validEvents: this.auditResult.validEvents,
-      loans: this.state.loans,
-      investments: this.state.investments,
-      catalogs: this.state.catalogs
-    });
-
-    if (mode === 'EXPENSE' && amountCents > childState.availableCents) {
-      if (overdraftPolicy === 'BLOCK') {
-        this.showToast(
-          `Saldo disponible insuficiente (${formatMoneyCents(childState.availableCents)}). Puedes elegir convertir el faltante en un Crédito Familiar.`,
-          'warn'
-        );
+      if (amountCents <= 0) {
+        this.showToast('Ingresa un monto mayor a $0.00', 'warn');
         return;
       }
 
-      const shortfallCents = amountCents - Math.max(0, childState.availableCents);
-      const loanPlan = generateLoanSchedule({
-        principalCents: shortfallCents,
-        interestRatePercent: 5,
-        termPeriods: 4,
-        interestType: 'SIMPLE',
-        frequency: 'WEEKLY',
-        startDate: localDate
+      if (editId) {
+        const ev = (this.state.ledgerEvents || []).find((e) => e.id === editId);
+        if (ev) {
+          ev.memberId = memberId;
+          ev.amountCents = amountCents;
+          ev.catalogId = catalogId;
+          ev.localDate = localDate;
+          ev.note = note;
+          if (ev.type === 'INCOME' || ev.type === 'EXPENSE') {
+            ev.type = mode;
+          }
+          ev.updatedAt = new Date().toISOString();
+          await this.reSignLedgerChain();
+          this.selectedChildId = memberId;
+          document.getElementById('dialogTransaction')?.close();
+          await this.cloudManager.pushState(this.state);
+          await this.runLedgerAuditAndRender();
+          this.showToast('Movimiento modificado y firmado nuevamente.', 'success');
+          return;
+        }
+      }
+
+      const childState = reduceMemberFinancialState({
+        memberId,
+        validEvents: this.auditResult.validEvents,
+        loans: this.state.loans,
+        investments: this.state.investments,
+        catalogs: this.state.catalogs
       });
 
-      const newLoan = {
-        id: `loan_auto_${Date.now()}`,
-        familyId: this.state.family.id,
-        memberId,
-        concept: `Crédito por faltante en compra: ${note}`,
-        principalCents: shortfallCents,
-        interestType: 'SIMPLE',
-        interestRatePercent: 5,
-        termPeriods: 4,
-        frequency: 'WEEKLY',
-        disbursedToPiggy: true,
-        totalInterestCents: loanPlan.totalInterestCents,
-        totalPayableCents: loanPlan.totalPayableCents,
-        interestSavedByExtraPaymentsCents: 0,
-        schedule: loanPlan.schedule,
-        startDate: localDate,
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      this.state.loans.push(newLoan);
+      if (mode === 'EXPENSE' && amountCents > childState.availableCents) {
+        if (overdraftPolicy === 'BLOCK') {
+          this.showToast(
+            `Saldo disponible insuficiente (${formatMoneyCents(childState.availableCents)}). Puedes elegir convertir el faltante en un Préstamo Familiar.`,
+            'warn'
+          );
+          return;
+        }
 
-      const signedLoanDisb = await createSignedLedgerEvent(
+        const shortfallCents = amountCents - Math.max(0, childState.availableCents);
+        const loanPlan = generateLoanSchedule({
+          principalCents: shortfallCents,
+          interestRatePercent: 5,
+          termPeriods: 4,
+          interestType: 'SIMPLE',
+          frequency: 'WEEKLY',
+          startDate: localDate
+        });
+
+        const newLoan = {
+          id: `loan_auto_${Date.now()}`,
+          familyId: this.state.family.id,
+          memberId,
+          concept: `Préstamo por faltante en compra: ${note}`,
+          principalCents: shortfallCents,
+          interestType: 'SIMPLE',
+          interestRatePercent: 5,
+          termPeriods: 4,
+          frequency: 'WEEKLY',
+          disbursedToPiggy: true,
+          totalInterestCents: loanPlan.totalInterestCents,
+          totalPayableCents: loanPlan.totalPayableCents,
+          interestSavedByExtraPaymentsCents: 0,
+          schedule: loanPlan.schedule,
+          startDate: localDate,
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        this.state.loans.push(newLoan);
+
+        const signedLoanDisb = await createSignedLedgerEvent(
+          {
+            familyId: this.state.family.id,
+            memberId,
+            createdByParentId: this.activeParentId,
+            type: 'LOAN_DISBURSEMENT',
+            amountCents: shortfallCents,
+            catalogId: 'cat_exp_loan',
+            referenceId: newLoan.id,
+            metadata: { disbursedToPiggy: true },
+            note: `Préstamo automático para completar: ${note}`,
+            localDate
+          },
+          this.parentSigningKey,
+          this.state.family.saltHex,
+          this.getLastEventHash()
+        );
+        this.state.ledgerEvents.push(signedLoanDisb);
+      }
+
+      const signedTx = await createSignedLedgerEvent(
         {
           familyId: this.state.family.id,
           memberId,
           createdByParentId: this.activeParentId,
-          type: 'LOAN_DISBURSEMENT',
-          amountCents: shortfallCents,
-          catalogId: 'cat_exp_loan',
-          referenceId: newLoan.id,
-          metadata: { disbursedToPiggy: true },
-          note: `Desembolso de crédito automático para cubrir: ${note}`,
+          type: mode,
+          amountCents,
+          catalogId,
+          note,
           localDate
         },
         this.parentSigningKey,
         this.state.family.saltHex,
         this.getLastEventHash()
       );
-      this.state.ledgerEvents.push(signedLoanDisb);
-    }
 
-    const signedTx = await createSignedLedgerEvent(
-      {
-        familyId: this.state.family.id,
-        memberId,
-        createdByParentId: this.activeParentId,
-        type: mode,
-        amountCents,
-        catalogId,
-        note,
-        localDate
-      },
-      this.parentSigningKey,
-      this.state.family.saltHex,
-      this.getLastEventHash()
-    );
+      this.state.ledgerEvents.push(signedTx);
+      this.selectedChildId = memberId;
+      document.getElementById('dialogTransaction')?.close();
 
-    this.state.ledgerEvents.push(signedTx);
-    this.selectedChildId = memberId;
-    document.getElementById('dialogTransaction')?.close();
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(
+        mode === 'INCOME'
+          ? `¡Listo! Se guardaron ${formatMoneyCents(amountCents)} en la alcancía.`
+          : `¡Listo! Se descontó el gasto de ${formatMoneyCents(amountCents)}.`,
+        'success'
+      );
+    });
+  }
 
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast(
-      mode === 'INCOME'
-        ? `Ingreso de ${formatMoneyCents(amountCents)} firmado y acreditado.`
-        : `Gasto de ${formatMoneyCents(amountCents)} descontado y firmado en el Ledger.`,
-      'success'
-    );
+  async handleDeleteTransaction(txId) {
+    await this.runAsParent(async () => {
+      const ev = (this.state.ledgerEvents || []).find((e) => e.id === txId);
+      if (!ev) return;
+      this.markDeletedId(txId);
+      this.state.ledgerEvents = (this.state.ledgerEvents || []).filter(
+        (e) => e.id !== txId && e.targetEventId !== txId
+      );
+      await this.reSignLedgerChain();
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast('Movimiento borrado de la alcancía.', 'info');
+    });
   }
 
   async handleReverseTransaction(targetEventId) {
-    if (!this.ensureParentPermission()) return;
-    const orig = (this.state.ledgerEvents || []).find((e) => e.id === targetEventId);
-    if (!orig) return;
+    await this.runAsParent(async () => {
+      const orig = (this.state.ledgerEvents || []).find((e) => e.id === targetEventId);
+      if (!orig) return;
 
-    const reversalEvent = await createSignedLedgerEvent(
-      {
-        familyId: this.state.family.id,
-        memberId: orig.memberId,
-        createdByParentId: this.activeParentId,
-        type: 'REVERSAL',
-        amountCents: orig.amountCents,
-        catalogId: orig.catalogId,
-        targetEventId: orig.id,
-        note: `Contra-asiento de anulación de: "${orig.note || orig.type}"`,
-        localDate: getTodayLocalDate()
-      },
-      this.parentSigningKey,
-      this.state.family.saltHex,
-      this.getLastEventHash()
-    );
+      const reversalEvent = await createSignedLedgerEvent(
+        {
+          familyId: this.state.family.id,
+          memberId: orig.memberId,
+          createdByParentId: this.activeParentId,
+          type: 'REVERSAL',
+          amountCents: orig.amountCents,
+          catalogId: orig.catalogId,
+          targetEventId: orig.id,
+          note: `Cancelación de: "${orig.note || orig.type}"`,
+          localDate: getTodayLocalDate()
+        },
+        this.parentSigningKey,
+        this.state.family.saltHex,
+        this.getLastEventHash()
+      );
 
-    this.state.ledgerEvents.push(reversalEvent);
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast('Movimiento revertido mediante contra-asiento firmado (trazabilidad intacta).', 'info');
+      this.state.ledgerEvents.push(reversalEvent);
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast('Movimiento cancelado y saldo devuelto.', 'info');
+    });
   }
 
   async submitRecurringForm() {
-    if (!this.ensureParentPermission()) return;
-    const memberId = document.getElementById('recChildSelect').value;
-    const catalogId = document.getElementById('recCatalogSelect').value;
-    const title = document.getElementById('recTitleInput').value.trim();
-    const amountCents = toCents(document.getElementById('recAmountInput').value);
-    const frequency = document.getElementById('recFrequencySelect').value;
-    const nextExecutionDate = document.getElementById('recNextDateInput').value || getTodayLocalDate();
-    const autoDeductLoanId = document.getElementById('recAutoLoanSelect').value;
+    await this.runAsParent(async () => {
+      const editId = (document.getElementById('recEditIdInput')?.value || '').trim();
+      const memberId = document.getElementById('recChildSelect').value;
+      const catalogId = document.getElementById('recCatalogSelect').value;
+      const title = document.getElementById('recTitleInput').value.trim();
+      const amountCents = toCents(document.getElementById('recAmountInput').value);
+      const frequency = document.getElementById('recFrequencySelect').value;
+      const nextExecutionDate = document.getElementById('recNextDateInput').value || getTodayLocalDate();
+      const autoDeductLoanId = document.getElementById('recAutoLoanSelect').value;
 
-    const newRule = {
-      id: `rec_${Date.now()}`,
-      familyId: this.state.family.id,
-      memberId,
-      catalogId,
-      title,
-      amountCents,
-      frequency,
-      startDate: getTodayLocalDate(),
-      nextExecutionDate,
-      autoDeductLoanId,
-      status: 'ACTIVE',
-      updatedAt: new Date().toISOString()
-    };
+      if (editId) {
+        const existing = (this.state.recurringRules || []).find((r) => r.id === editId);
+        if (existing) {
+          existing.memberId = memberId;
+          existing.catalogId = catalogId;
+          existing.title = title;
+          existing.amountCents = amountCents;
+          existing.frequency = frequency;
+          existing.nextExecutionDate = nextExecutionDate;
+          existing.autoDeductLoanId = autoDeductLoanId;
+          existing.updatedAt = new Date().toISOString();
+          this.selectedChildId = memberId;
+          document.getElementById('dialogRecurring')?.close();
+          await this.cloudManager.pushState(this.state);
+          this.renderAll();
+          this.showToast(`Mesada "${title}" actualizada.`, 'success');
+          return;
+        }
+      }
 
-    this.state.recurringRules.push(newRule);
-    this.selectedChildId = memberId;
-    document.getElementById('dialogRecurring')?.close();
+      const newRule = {
+        id: `rec_${Date.now()}`,
+        familyId: this.state.family.id,
+        memberId,
+        catalogId,
+        title,
+        amountCents,
+        frequency,
+        startDate: getTodayLocalDate(),
+        nextExecutionDate,
+        autoDeductLoanId,
+        status: 'ACTIVE',
+        updatedAt: new Date().toISOString()
+      };
 
-    await this.consolidateDueAutomationsAsParent(true);
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast(`Regla recurrente "${title}" programada.`, 'success');
+      this.state.recurringRules.push(newRule);
+      this.selectedChildId = memberId;
+      document.getElementById('dialogRecurring')?.close();
+
+      await this.consolidateDueAutomationsAsParent(true);
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(`Mesada "${title}" programada.`, 'success');
+    });
+  }
+
+  async handleDeleteRecurring(ruleId) {
+    await this.runAsParent(async () => {
+      this.markDeletedId(ruleId);
+      this.state.recurringRules = (this.state.recurringRules || []).filter((r) => r.id !== ruleId);
+      await this.cloudManager.pushState(this.state);
+      this.renderAll();
+      this.showToast('Mesada programada borrada.', 'info');
+    });
   }
 
   async handleManualTriggerRecurring(ruleId) {
-    if (!this.ensureParentPermission()) return;
-    const rule = (this.state.recurringRules || []).find((r) => r.id === ruleId);
-    if (!rule) return;
+    await this.runAsParent(async () => {
+      const rule = (this.state.recurringRules || []).find((r) => r.id === ruleId);
+      if (!rule) return;
 
-    const execDate = rule.nextExecutionDate || getTodayLocalDate();
-    const detId = `det_rec_${rule.id}_${execDate}_${Date.now().toString(36).slice(-3)}`;
+      const execDate = rule.nextExecutionDate || getTodayLocalDate();
+      const detId = `det_rec_${rule.id}_${execDate}_${Date.now().toString(36).slice(-3)}`;
 
-    const signedIncome = await createSignedLedgerEvent(
-      {
-        id: detId,
-        familyId: this.state.family.id,
-        memberId: rule.memberId,
-        createdByParentId: this.activeParentId,
-        type: 'RECURRING_INCOME',
-        amountCents: rule.amountCents,
-        catalogId: rule.catalogId,
-        referenceId: rule.id,
-        note: `Acreditación de ingreso recurrente: ${rule.title}`,
-        localDate: getTodayLocalDate()
-      },
-      this.parentSigningKey,
-      this.state.family.saltHex,
-      this.getLastEventHash()
-    );
-    this.state.ledgerEvents.push(signedIncome);
-
-    if (rule.autoDeductLoanId) {
-      await this.applyAutomaticLoanDeductionFromAllowance(
-        rule.memberId,
-        rule.autoDeductLoanId,
-        rule.amountCents,
-        getTodayLocalDate()
+      const signedIncome = await createSignedLedgerEvent(
+        {
+          id: detId,
+          familyId: this.state.family.id,
+          memberId: rule.memberId,
+          createdByParentId: this.activeParentId,
+          type: 'RECURRING_INCOME',
+          amountCents: rule.amountCents,
+          catalogId: rule.catalogId,
+          referenceId: rule.id,
+          note: `Mesada depositada: ${rule.title}`,
+          localDate: getTodayLocalDate()
+        },
+        this.parentSigningKey,
+        this.state.family.saltHex,
+        this.getLastEventHash()
       );
-    }
+      this.state.ledgerEvents.push(signedIncome);
 
-    const daysStep = rule.frequency === 'DAILY' ? 1 : rule.frequency === 'WEEKLY' ? 7 : rule.frequency === 'BIWEEKLY' ? 14 : 30;
-    rule.nextExecutionDate = addDaysLocalDate(execDate, daysStep);
-    rule.updatedAt = new Date().toISOString();
+      if (rule.autoDeductLoanId) {
+        await this.applyAutomaticLoanDeductionFromAllowance(
+          rule.memberId,
+          rule.autoDeductLoanId,
+          rule.amountCents,
+          getTodayLocalDate()
+        );
+      }
 
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast(`Se acreditó "${rule.title}" (+${formatMoneyCents(rule.amountCents)}) en la alcancía.`, 'success');
+      const daysStep = rule.frequency === 'DAILY' ? 1 : rule.frequency === 'WEEKLY' ? 7 : rule.frequency === 'BIWEEKLY' ? 14 : 30;
+      rule.nextExecutionDate = addDaysLocalDate(execDate, daysStep);
+      rule.updatedAt = new Date().toISOString();
+
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(`Se depositó "${rule.title}" (+${formatMoneyCents(rule.amountCents)}) en la alcancía.`, 'success');
+    });
   }
 
   async handleToggleRecurringStatus(ruleId) {
-    if (!this.ensureParentPermission()) return;
-    const rule = (this.state.recurringRules || []).find((r) => r.id === ruleId);
-    if (!rule) return;
-    rule.status = rule.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-    rule.updatedAt = new Date().toISOString();
-    await this.cloudManager.pushState(this.state);
-    this.renderAll();
+    await this.runAsParent(async () => {
+      const rule = (this.state.recurringRules || []).find((r) => r.id === ruleId);
+      if (!rule) return;
+      rule.status = rule.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+      rule.updatedAt = new Date().toISOString();
+      await this.cloudManager.pushState(this.state);
+      this.renderAll();
+    });
   }
 
   async submitLoanForm() {
-    if (!this.ensureParentPermission()) return;
-    const memberId = document.getElementById('loanChildSelect').value;
-    const principalCents = toCents(document.getElementById('loanPrincipalInput').value);
-    const concept = document.getElementById('loanConceptInput').value.trim();
-    const interestType = document.getElementById('loanInterestType').value;
-    const interestRatePercent = Number(document.getElementById('loanRateInput').value || 0);
-    const termPeriods = Number(document.getElementById('loanPeriodsInput').value || 4);
-    const frequency = document.getElementById('loanFrequencySelect').value;
-    const disbursedToPiggy = document.getElementById('loanDisburseSelect').value === 'DEPOSIT_TO_PIGGY';
-    const today = getTodayLocalDate();
+    await this.runAsParent(async () => {
+      const editId = (document.getElementById('loanEditIdInput')?.value || '').trim();
+      const memberId = document.getElementById('loanChildSelect').value;
+      const principalCents = toCents(document.getElementById('loanPrincipalInput').value);
+      const concept = document.getElementById('loanConceptInput').value.trim();
+      const interestType = document.getElementById('loanInterestType').value;
+      const interestRatePercent = Number(document.getElementById('loanRateInput').value || 0);
+      const termPeriods = Number(document.getElementById('loanPeriodsInput').value || 4);
+      const frequency = document.getElementById('loanFrequencySelect').value;
+      const disbursedToPiggy = document.getElementById('loanDisburseSelect').value === 'DEPOSIT_TO_PIGGY';
+      const today = getTodayLocalDate();
 
-    const plan = generateLoanSchedule({
-      principalCents,
-      interestRatePercent,
-      termPeriods,
-      interestType,
-      frequency,
-      startDate: today
-    });
+      const plan = generateLoanSchedule({
+        principalCents,
+        interestRatePercent,
+        termPeriods,
+        interestType,
+        frequency,
+        startDate: today
+      });
 
-    const newLoan = {
-      id: `loan_${Date.now()}`,
-      familyId: this.state.family.id,
-      memberId,
-      concept,
-      principalCents: plan.principalCents,
-      interestType,
-      interestRatePercent,
-      termPeriods,
-      frequency,
-      disbursedToPiggy,
-      totalInterestCents: plan.totalInterestCents,
-      totalPayableCents: plan.totalPayableCents,
-      interestSavedByExtraPaymentsCents: 0,
-      schedule: plan.schedule,
-      startDate: today,
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+      if (editId) {
+        const existing = (this.state.loans || []).find((l) => l.id === editId);
+        if (existing) {
+          existing.memberId = memberId;
+          existing.concept = concept;
+          existing.principalCents = plan.principalCents;
+          existing.interestType = interestType;
+          existing.interestRatePercent = interestRatePercent;
+          existing.termPeriods = termPeriods;
+          existing.frequency = frequency;
+          existing.disbursedToPiggy = disbursedToPiggy;
+          existing.totalInterestCents = plan.totalInterestCents;
+          existing.totalPayableCents = plan.totalPayableCents;
+          existing.schedule = plan.schedule;
+          existing.updatedAt = new Date().toISOString();
 
-    this.state.loans.push(newLoan);
+          const disbEv = (this.state.ledgerEvents || []).find(
+            (e) => e.referenceId === existing.id && e.type === 'LOAN_DISBURSEMENT'
+          );
+          if (disbEv) {
+            disbEv.memberId = memberId;
+            disbEv.amountCents = principalCents;
+            disbEv.metadata = { disbursedToPiggy };
+            disbEv.note = `Préstamo: ${concept} (${disbursedToPiggy ? 'Depositado en alcancía' : 'Compra directa'})`;
+            disbEv.updatedAt = new Date().toISOString();
+            await this.reSignLedgerChain();
+          }
 
-    const signedDisb = await createSignedLedgerEvent(
-      {
+          this.selectedChildId = memberId;
+          document.getElementById('dialogLoan')?.close();
+          await this.cloudManager.pushState(this.state);
+          await this.runLedgerAuditAndRender();
+          this.showToast(`Préstamo "${concept}" modificado.`, 'success');
+          return;
+        }
+      }
+
+      const newLoan = {
+        id: `loan_${Date.now()}`,
         familyId: this.state.family.id,
         memberId,
-        createdByParentId: this.activeParentId,
-        type: 'LOAN_DISBURSEMENT',
-        amountCents: principalCents,
-        catalogId: 'cat_exp_loan',
-        referenceId: newLoan.id,
-        metadata: { disbursedToPiggy },
-        note: `Otorgamiento de Crédito: ${concept} (${disbursedToPiggy ? 'Depositado en alcancía' : 'Compra directa financiada'})`,
-        localDate: today
-      },
-      this.parentSigningKey,
-      this.state.family.saltHex,
-      this.getLastEventHash()
-    );
+        concept,
+        principalCents: plan.principalCents,
+        interestType,
+        interestRatePercent,
+        termPeriods,
+        frequency,
+        disbursedToPiggy,
+        totalInterestCents: plan.totalInterestCents,
+        totalPayableCents: plan.totalPayableCents,
+        interestSavedByExtraPaymentsCents: 0,
+        schedule: plan.schedule,
+        startDate: today,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-    this.state.ledgerEvents.push(signedDisb);
-    this.selectedChildId = memberId;
-    document.getElementById('dialogLoan')?.close();
+      this.state.loans.push(newLoan);
 
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast(`Crédito "${concept}" otorgado con tabla de amortización exacta al centavo.`, 'success');
+      const signedDisb = await createSignedLedgerEvent(
+        {
+          familyId: this.state.family.id,
+          memberId,
+          createdByParentId: this.activeParentId,
+          type: 'LOAN_DISBURSEMENT',
+          amountCents: principalCents,
+          catalogId: 'cat_exp_loan',
+          referenceId: newLoan.id,
+          metadata: { disbursedToPiggy },
+          note: `Préstamo: ${concept} (${disbursedToPiggy ? 'Depositado en alcancía' : 'Compra directa'})`,
+          localDate: today
+        },
+        this.parentSigningKey,
+        this.state.family.saltHex,
+        this.getLastEventHash()
+      );
+
+      this.state.ledgerEvents.push(signedDisb);
+      this.selectedChildId = memberId;
+      document.getElementById('dialogLoan')?.close();
+
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(`Préstamo "${concept}" creado.`, 'success');
+    });
+  }
+
+  async handleDeleteLoan(loanId) {
+    await this.runAsParent(async () => {
+      this.markDeletedId(loanId);
+      const relatedEvents = (this.state.ledgerEvents || []).filter((e) => e.referenceId === loanId);
+      relatedEvents.forEach((e) => this.markDeletedId(e.id));
+      this.state.ledgerEvents = (this.state.ledgerEvents || []).filter((e) => e.referenceId !== loanId);
+      this.state.loans = (this.state.loans || []).filter((l) => l.id !== loanId);
+      await this.reSignLedgerChain();
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast('Préstamo y sus movimientos asociados fueron borrados.', 'info');
+    });
   }
 
   async handlePayLoanInstallment(loanId, installmentNumber, paymentSource = 'PIGGY') {
-    if (!this.ensureParentPermission()) return;
-    const loan = (this.state.loans || []).find((l) => l.id === loanId);
-    if (!loan) return;
-    const inst = (loan.schedule || []).find((i) => i.installmentNumber === installmentNumber);
-    if (!inst || inst.status === 'PAID') return;
+    await this.runAsParent(async () => {
+      const loan = (this.state.loans || []).find((l) => l.id === loanId);
+      if (!loan) return;
+      const inst = (loan.schedule || []).find((i) => i.installmentNumber === installmentNumber);
+      if (!inst || inst.status === 'PAID') return;
 
-    const pendingCents = Math.max(0, inst.totalInstallmentCents - (inst.paidCents || 0));
-    let amountToPay = pendingCents;
+      const pendingCents = Math.max(0, inst.totalInstallmentCents - (inst.paidCents || 0));
+      let amountToPay = pendingCents;
 
-    if (paymentSource === 'PIGGY') {
-      const childFinance = reduceMemberFinancialState({
-        memberId: loan.memberId,
-        validEvents: this.auditResult.validEvents,
-        loans: this.state.loans,
-        investments: this.state.investments,
-        catalogs: this.state.catalogs
-      });
+      if (paymentSource === 'PIGGY') {
+        const childFinance = reduceMemberFinancialState({
+          memberId: loan.memberId,
+          validEvents: this.auditResult.validEvents,
+          loans: this.state.loans,
+          investments: this.state.investments,
+          catalogs: this.state.catalogs
+        });
 
-      if (childFinance.availableCents <= 0) {
-        inst.status = 'OVERDUE';
-        loan.updatedAt = new Date().toISOString();
-        await this.cloudManager.pushState(this.state);
-        this.renderAll();
-        this.showToast('La alcancía tiene $0.00 disponibles. La cuota se marcó EN MORA.', 'warn');
-        return;
-      }
+        if (childFinance.availableCents <= 0) {
+          inst.status = 'OVERDUE';
+          loan.updatedAt = new Date().toISOString();
+          await this.cloudManager.pushState(this.state);
+          this.renderAll();
+          this.showToast('La alcancía tiene $0.00 disponibles. Usa "Pagó en Efectivo" o deposita dinero primero.', 'warn');
+          return;
+        }
 
-      if (childFinance.availableCents < pendingCents) {
-        amountToPay = childFinance.availableCents;
-        inst.paidCents = (inst.paidCents || 0) + amountToPay;
-        inst.status = 'OVERDUE';
-        this.showToast(
-          `Saldo parcial: Se cobraron ${formatMoneyCents(amountToPay)} y restan ${formatMoneyCents(pendingCents - amountToPay)} en mora.`,
-          'warn'
-        );
+        if (childFinance.availableCents < pendingCents) {
+          amountToPay = childFinance.availableCents;
+          inst.paidCents = (inst.paidCents || 0) + amountToPay;
+          inst.status = 'OVERDUE';
+          this.showToast(
+            `Pago parcial: Se tomaron ${formatMoneyCents(amountToPay)} y faltan ${formatMoneyCents(pendingCents - amountToPay)}.`,
+            'warn'
+          );
+        } else {
+          inst.paidCents = inst.totalInstallmentCents;
+          inst.status = 'PAID';
+        }
       } else {
         inst.paidCents = inst.totalInstallmentCents;
         inst.status = 'PAID';
       }
-    } else {
-      inst.paidCents = inst.totalInstallmentCents;
-      inst.status = 'PAID';
-    }
 
-    if (loan.schedule.every((i) => i.status === 'PAID')) {
-      loan.status = 'PAID_OFF';
-    }
-    loan.updatedAt = new Date().toISOString();
+      if (loan.schedule.every((i) => i.status === 'PAID')) {
+        loan.status = 'PAID_OFF';
+      }
+      loan.updatedAt = new Date().toISOString();
 
-    const signedPay = await createSignedLedgerEvent(
-      {
-        familyId: this.state.family.id,
-        memberId: loan.memberId,
-        createdByParentId: this.activeParentId,
-        type: 'LOAN_PAYMENT',
-        amountCents: amountToPay,
-        catalogId: 'cat_exp_loan',
-        referenceId: loan.id,
-        metadata: {
-          paymentSource,
-          installmentNumber,
-          interestPaidCents: Math.min(amountToPay, inst.interestPartCents)
+      const signedPay = await createSignedLedgerEvent(
+        {
+          familyId: this.state.family.id,
+          memberId: loan.memberId,
+          createdByParentId: this.activeParentId,
+          type: 'LOAN_PAYMENT',
+          amountCents: amountToPay,
+          catalogId: 'cat_exp_loan',
+          referenceId: loan.id,
+          metadata: {
+            paymentSource,
+            installmentNumber,
+            interestPaidCents: Math.min(amountToPay, inst.interestPartCents)
+          },
+          note: `Pago #${installmentNumber} - ${loan.concept} (${paymentSource === 'PIGGY' ? 'Desde Alcancía' : 'Efectivo/Tareas'})`,
+          localDate: getTodayLocalDate()
         },
-        note: `Pago Cuota #${installmentNumber} - ${loan.concept} (${paymentSource === 'PIGGY' ? 'Desde Alcancía' : 'Efectivo/Tareas Externas'})`,
-        localDate: getTodayLocalDate()
-      },
-      this.parentSigningKey,
-      this.state.family.saltHex,
-      this.getLastEventHash()
-    );
+        this.parentSigningKey,
+        this.state.family.saltHex,
+        this.getLastEventHash()
+      );
 
-    this.state.ledgerEvents.push(signedPay);
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast(`Pago de ${formatMoneyCents(amountToPay)} registrado en "${loan.concept}".`, 'success');
+      this.state.ledgerEvents.push(signedPay);
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(`Pago de ${formatMoneyCents(amountToPay)} anotado en "${loan.concept}".`, 'success');
+    });
   }
 
   async submitExtraPrincipalForm() {
-    if (!this.ensureParentPermission()) return;
-    const loanId = document.getElementById('extraLoanIdInput').value;
-    const extraCents = toCents(document.getElementById('extraAmountInput').value);
-    const paymentSource = document.getElementById('extraSourceSelect').value;
+    await this.runAsParent(async () => {
+      const loanId = document.getElementById('extraLoanIdInput').value;
+      const extraCents = toCents(document.getElementById('extraAmountInput').value);
+      const paymentSource = document.getElementById('extraSourceSelect').value;
 
-    const loanIdx = (this.state.loans || []).findIndex((l) => l.id === loanId);
-    if (loanIdx < 0) return;
-    const loan = this.state.loans[loanIdx];
+      const loanIdx = (this.state.loans || []).findIndex((l) => l.id === loanId);
+      if (loanIdx < 0) return;
+      const loan = this.state.loans[loanIdx];
 
-    if (paymentSource === 'PIGGY') {
+      if (paymentSource === 'PIGGY') {
+        const childFinance = reduceMemberFinancialState({
+          memberId: loan.memberId,
+          validEvents: this.auditResult.validEvents,
+          loans: this.state.loans,
+          investments: this.state.investments,
+          catalogs: this.state.catalogs
+        });
+        if (extraCents > childFinance.availableCents) {
+          this.showToast(`Saldo disponible insuficiente (${formatMoneyCents(childFinance.availableCents)}).`, 'warn');
+          return;
+        }
+      }
+
+      const { updatedLoan, interestSavedCents, actualExtraAppliedCents } = recalculateLoanAfterExtraPrincipal(
+        loan,
+        extraCents,
+        getTodayLocalDate()
+      );
+
+      updatedLoan.updatedAt = new Date().toISOString();
+      this.state.loans[loanIdx] = updatedLoan;
+
+      const signedExtra = await createSignedLedgerEvent(
+        {
+          familyId: this.state.family.id,
+          memberId: loan.memberId,
+          createdByParentId: this.activeParentId,
+          type: 'EXTRA_PRINCIPAL_PAYMENT',
+          amountCents: actualExtraAppliedCents,
+          catalogId: 'cat_exp_loan',
+          referenceId: loan.id,
+          metadata: {
+            paymentSource,
+            interestSavedCents,
+            interestPaidCents: 0
+          },
+          note: `Pago adelantado en "${loan.concept}" (Ahorro en intereses: ${formatMoneyCents(interestSavedCents)})`,
+          localDate: getTodayLocalDate()
+        },
+        this.parentSigningKey,
+        this.state.family.saltHex,
+        this.getLastEventHash()
+      );
+
+      this.state.ledgerEvents.push(signedExtra);
+      document.getElementById('dialogExtraPrincipal')?.close();
+
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(
+        `¡Súper! Pago adelantado aplicado. Te ahorraste ${formatMoneyCents(interestSavedCents)} en intereses.`,
+        'success'
+      );
+    });
+  }
+
+  async submitInvestmentForm() {
+    await this.runAsParent(async () => {
+      const editId = (document.getElementById('invEditIdInput')?.value || '').trim();
+      const memberId = document.getElementById('invChildSelect').value;
+      const principalCents = toCents(document.getElementById('invPrincipalInput').value);
+      const title = document.getElementById('invTitleInput').value.trim();
+      const termDays = Math.max(1, Number(document.getElementById('invTermDaysInput').value || 30));
+      const yieldRatePercent = Math.max(0.5, Number(document.getElementById('invYieldRateInput').value || 10));
+      const today = getTodayLocalDate();
+
+      if (editId) {
+        const existing = (this.state.investments || []).find((i) => i.id === editId);
+        if (existing) {
+          existing.memberId = memberId;
+          existing.title = title;
+          existing.principalCents = principalCents;
+          existing.termDays = termDays;
+          existing.yieldRatePercent = yieldRatePercent;
+          existing.maturityDate = addDaysLocalDate(existing.startDate || today, termDays);
+          existing.updatedAt = new Date().toISOString();
+
+          const lockEv = (this.state.ledgerEvents || []).find(
+            (e) => e.referenceId === existing.id && e.type === 'INVESTMENT_LOCK'
+          );
+          if (lockEv) {
+            lockEv.memberId = memberId;
+            lockEv.amountCents = principalCents;
+            lockEv.note = `Ahorro a Plazo (${termDays} días al +${yieldRatePercent}%): ${title}`;
+            lockEv.updatedAt = new Date().toISOString();
+            await this.reSignLedgerChain();
+          }
+
+          this.selectedChildId = memberId;
+          document.getElementById('dialogInvestment')?.close();
+          await this.cloudManager.pushState(this.state);
+          await this.runLedgerAuditAndRender();
+          this.showToast(`Ahorro a plazo "${title}" modificado.`, 'success');
+          return;
+        }
+      }
+
       const childFinance = reduceMemberFinancialState({
-        memberId: loan.memberId,
+        memberId,
         validEvents: this.auditResult.validEvents,
         loans: this.state.loans,
         investments: this.state.investments,
         catalogs: this.state.catalogs
       });
-      if (extraCents > childFinance.availableCents) {
-        this.showToast(`Saldo disponible insuficiente (${formatMoneyCents(childFinance.availableCents)}).`, 'warn');
+
+      if (principalCents > childFinance.availableCents) {
+        this.showToast(
+          `El monto a guardar (${formatMoneyCents(principalCents)}) supera el dinero libre en la alcancía (${formatMoneyCents(childFinance.availableCents)}). Primero mete dinero en la alcancía.`,
+          'warn'
+        );
         return;
       }
-    }
 
-    const { updatedLoan, interestSavedCents, actualExtraAppliedCents } = recalculateLoanAfterExtraPrincipal(
-      loan,
-      extraCents,
-      getTodayLocalDate()
-    );
-
-    updatedLoan.updatedAt = new Date().toISOString();
-    this.state.loans[loanIdx] = updatedLoan;
-
-    const signedExtra = await createSignedLedgerEvent(
-      {
-        familyId: this.state.family.id,
-        memberId: loan.memberId,
-        createdByParentId: this.activeParentId,
-        type: 'EXTRA_PRINCIPAL_PAYMENT',
-        amountCents: actualExtraAppliedCents,
-        catalogId: 'cat_exp_loan',
-        referenceId: loan.id,
-        metadata: {
-          paymentSource,
-          interestSavedCents,
-          interestPaidCents: 0
-        },
-        note: `Abono Extraordinario a Capital en "${loan.concept}" (Ahorro en intereses: ${formatMoneyCents(interestSavedCents)})`,
-        localDate: getTodayLocalDate()
-      },
-      this.parentSigningKey,
-      this.state.family.saltHex,
-      this.getLastEventHash()
-    );
-
-    this.state.ledgerEvents.push(signedExtra);
-    document.getElementById('dialogExtraPrincipal')?.close();
-
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast(
-      `Abono a capital aplicado. Se recalcularon las cuotas ahorrando ${formatMoneyCents(interestSavedCents)} en intereses.`,
-      'success'
-    );
-  }
-
-  async submitInvestmentForm() {
-    if (!this.ensureParentPermission()) return;
-    const memberId = document.getElementById('invChildSelect').value;
-    const principalCents = toCents(document.getElementById('invPrincipalInput').value);
-    const title = document.getElementById('invTitleInput').value.trim();
-    const termDays = Math.max(1, Number(document.getElementById('invTermDaysInput').value || 30));
-    const yieldRatePercent = Math.max(0.5, Number(document.getElementById('invYieldRateInput').value || 10));
-    const today = getTodayLocalDate();
-
-    const childFinance = reduceMemberFinancialState({
-      memberId,
-      validEvents: this.auditResult.validEvents,
-      loans: this.state.loans,
-      investments: this.state.investments,
-      catalogs: this.state.catalogs
-    });
-
-    if (principalCents > childFinance.availableCents) {
-      this.showToast(
-        `El monto a invertir (${formatMoneyCents(principalCents)}) supera el saldo disponible en la alcancía (${formatMoneyCents(childFinance.availableCents)}).`,
-        'warn'
-      );
-      return;
-    }
-
-    const newInv = {
-      id: `inv_${Date.now()}`,
-      familyId: this.state.family.id,
-      memberId,
-      title,
-      principalCents,
-      yieldRatePercent,
-      termDays,
-      startDate: today,
-      maturityDate: addDaysLocalDate(today, termDays),
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    this.state.investments.push(newInv);
-
-    const signedLock = await createSignedLedgerEvent(
-      {
+      const newInv = {
+        id: `inv_${Date.now()}`,
         familyId: this.state.family.id,
         memberId,
-        createdByParentId: this.activeParentId,
-        type: 'INVESTMENT_LOCK',
-        amountCents: principalCents,
-        catalogId: 'cat_inc_yield',
-        referenceId: newInv.id,
-        note: `Apertura de Inversión a Plazo (${termDays} días al +${yieldRatePercent}%): ${title}`,
-        localDate: today
-      },
-      this.parentSigningKey,
-      this.state.family.saltHex,
-      this.getLastEventHash()
-    );
+        title,
+        principalCents,
+        yieldRatePercent,
+        termDays,
+        startDate: today,
+        maturityDate: addDaysLocalDate(today, termDays),
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-    this.state.ledgerEvents.push(signedLock);
-    this.selectedChildId = memberId;
-    document.getElementById('dialogInvestment')?.close();
+      this.state.investments.push(newInv);
 
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast(`Inversión "${title}" iniciada. El saldo quedó bloqueado generando rendimiento.`, 'success');
+      const signedLock = await createSignedLedgerEvent(
+        {
+          familyId: this.state.family.id,
+          memberId,
+          createdByParentId: this.activeParentId,
+          type: 'INVESTMENT_LOCK',
+          amountCents: principalCents,
+          catalogId: 'cat_inc_yield',
+          referenceId: newInv.id,
+          note: `Ahorro a Plazo (${termDays} días al +${yieldRatePercent}%): ${title}`,
+          localDate: today
+        },
+        this.parentSigningKey,
+        this.state.family.saltHex,
+        this.getLastEventHash()
+      );
+
+      this.state.ledgerEvents.push(signedLock);
+      this.selectedChildId = memberId;
+      document.getElementById('dialogInvestment')?.close();
+
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(`Ahorro a plazo "${title}" iniciado.`, 'success');
+    });
+  }
+
+  async handleDeleteInvestment(invId) {
+    await this.runAsParent(async () => {
+      this.markDeletedId(invId);
+      const relatedEvents = (this.state.ledgerEvents || []).filter((e) => e.referenceId === invId);
+      relatedEvents.forEach((e) => this.markDeletedId(e.id));
+      this.state.ledgerEvents = (this.state.ledgerEvents || []).filter((e) => e.referenceId !== invId);
+      this.state.investments = (this.state.investments || []).filter((i) => i.id !== invId);
+      await this.reSignLedgerChain();
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast('Ahorro a plazo borrado.', 'info');
+    });
   }
 
   async handleSettleInvestment(investmentId, isEarlyExit = false) {
-    if (!this.ensureParentPermission()) return;
-    const inv = (this.state.investments || []).find((i) => i.id === investmentId && i.status === 'ACTIVE');
-    if (!inv) return;
+    await this.runAsParent(async () => {
+      const inv = (this.state.investments || []).find((i) => i.id === investmentId && i.status === 'ACTIVE');
+      if (!inv) return;
 
-    const evalInv = evaluateInvestmentProgress(inv, getTodayLocalDate());
-    const today = getTodayLocalDate();
+      const evalInv = evaluateInvestmentProgress(inv, getTodayLocalDate());
+      const today = getTodayLocalDate();
 
-    if (isEarlyExit) {
-      inv.status = 'CANCELLED_EARLY';
-      inv.updatedAt = new Date().toISOString();
+      if (isEarlyExit) {
+        inv.status = 'CANCELLED_EARLY';
+        inv.updatedAt = new Date().toISOString();
 
-      const signedEarly = await createSignedLedgerEvent(
-        {
-          familyId: this.state.family.id,
-          memberId: inv.memberId,
-          createdByParentId: this.activeParentId,
-          type: 'INVESTMENT_EARLY_EXIT',
-          amountCents: inv.principalCents,
-          catalogId: 'cat_inc_yield',
-          referenceId: inv.id,
-          metadata: { principalCents: inv.principalCents, yieldCents: 0 },
-          note: `Rescate anticipado de inversión "${inv.title}" (Devolución de capital sin rendimiento)`,
-          localDate: today
-        },
-        this.parentSigningKey,
-        this.state.family.saltHex,
-        this.getLastEventHash()
-      );
-      this.state.ledgerEvents.push(signedEarly);
-      this.showToast(`Inversión rescatada anticipadamente. Se devolvieron ${formatMoneyCents(inv.principalCents)} al saldo disponible.`, 'info');
-    } else {
-      inv.status = 'MATURED';
-      inv.updatedAt = new Date().toISOString();
-
-      const signedMat = await createSignedLedgerEvent(
-        {
-          id: `det_inv_mat_${inv.id}`,
-          familyId: this.state.family.id,
-          memberId: inv.memberId,
-          createdByParentId: this.activeParentId,
-          type: 'INVESTMENT_MATURITY',
-          amountCents: evalInv.maturityTotalCents,
-          catalogId: 'cat_inc_yield',
-          referenceId: inv.id,
-          metadata: {
-            principalCents: inv.principalCents,
-            yieldCents: evalInv.expectedInterestCents
+        const signedEarly = await createSignedLedgerEvent(
+          {
+            familyId: this.state.family.id,
+            memberId: inv.memberId,
+            createdByParentId: this.activeParentId,
+            type: 'INVESTMENT_EARLY_EXIT',
+            amountCents: inv.principalCents,
+            catalogId: 'cat_inc_yield',
+            referenceId: inv.id,
+            metadata: { principalCents: inv.principalCents, yieldCents: 0 },
+            note: `Retiro antes de tiempo de "${inv.title}" (Sin premio)`,
+            localDate: today
           },
-          note: `Liquidación de Inversión "${inv.title}" (Capital ${formatMoneyCents(inv.principalCents)} + Rendimiento +${formatMoneyCents(evalInv.expectedInterestCents)})`,
-          localDate: today
-        },
-        this.parentSigningKey,
-        this.state.family.saltHex,
-        this.getLastEventHash()
-      );
-      this.state.ledgerEvents.push(signedMat);
-      this.showToast(
-        `Inversión liquidada. Se acreditaron ${formatMoneyCents(evalInv.maturityTotalCents)} (incluyendo +${formatMoneyCents(evalInv.expectedInterestCents)} de rendimiento).`,
-        'success'
-      );
-    }
+          this.parentSigningKey,
+          this.state.family.saltHex,
+          this.getLastEventHash()
+        );
+        this.state.ledgerEvents.push(signedEarly);
+        this.showToast(`Se devolvieron ${formatMoneyCents(inv.principalCents)} al dinero libre.`, 'info');
+      } else {
+        inv.status = 'MATURED';
+        inv.updatedAt = new Date().toISOString();
 
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
+        const signedMat = await createSignedLedgerEvent(
+          {
+            id: `det_inv_mat_${inv.id}`,
+            familyId: this.state.family.id,
+            memberId: inv.memberId,
+            createdByParentId: this.activeParentId,
+            type: 'INVESTMENT_MATURITY',
+            amountCents: evalInv.maturityTotalCents,
+            catalogId: 'cat_inc_yield',
+            referenceId: inv.id,
+            metadata: {
+              principalCents: inv.principalCents,
+              yieldCents: evalInv.expectedInterestCents
+            },
+            note: `Premio de Ahorro "${inv.title}" (${formatMoneyCents(inv.principalCents)} + Ganancia +${formatMoneyCents(evalInv.expectedInterestCents)})`,
+            localDate: today
+          },
+          this.parentSigningKey,
+          this.state.family.saltHex,
+          this.getLastEventHash()
+        );
+        this.state.ledgerEvents.push(signedMat);
+        this.showToast(
+          `¡Felicidades! Se entregaron ${formatMoneyCents(evalInv.maturityTotalCents)} (incluyendo +${formatMoneyCents(evalInv.expectedInterestCents)} de ganancia).`,
+          'success'
+        );
+      }
+
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+    });
   }
 
   async submitMemberForm() {
-    if (!this.ensureParentPermission()) return;
-    const role = document.getElementById('memRoleSelect').value;
-    const name = document.getElementById('memNameInput').value.trim();
-    const avatar = resolveIconKey(document.getElementById('memAvatarSelect').value, 'unicorn');
-    const ageOrTitle = document.getElementById('memAgeInput').value.trim();
-    const goalTitle = document.getElementById('memGoalTitleInput').value.trim() || 'Mi Meta de Ahorro';
-    const goalTargetCents = toCents(document.getElementById('memGoalAmountInput').value || 1500);
+    await this.runAsParent(async () => {
+      const editId = (document.getElementById('memEditIdInput')?.value || '').trim();
+      const role = document.getElementById('memRoleSelect').value;
+      const name = document.getElementById('memNameInput').value.trim();
+      const avatar = resolveIconKey(document.getElementById('memAvatarSelect').value, 'piggy');
+      const ageOrTitle = document.getElementById('memAgeInput').value.trim();
+      const goalTitle = document.getElementById('memGoalTitleInput').value.trim() || 'Mi Meta de Ahorro';
+      const goalTargetCents = toCents(document.getElementById('memGoalAmountInput').value || 1000);
 
-    const newMember = {
-      id: `${role.toLowerCase()}_${Date.now()}`,
-      familyId: this.state.family.id,
-      role,
-      name,
-      avatar,
-      age: role === 'CHILD' ? Number(ageOrTitle) || 10 : undefined,
-      title: role === 'PARENT' ? ageOrTitle || 'Administrador Familiar' : undefined,
-      themeColor: role === 'CHILD' ? '#10b981' : '#6366f1',
-      goalTitle: role === 'CHILD' ? goalTitle : undefined,
-      goalTargetCents: role === 'CHILD' ? goalTargetCents : undefined,
-      goalIcon: 'target',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+      if (editId) {
+        const existing = (this.state.members || []).find((m) => m.id === editId);
+        if (existing) {
+          existing.role = role;
+          existing.name = name;
+          existing.avatar = avatar;
+          if (role === 'CHILD') {
+            existing.age = Number(ageOrTitle) || 10;
+            existing.goalTitle = goalTitle;
+            existing.goalTargetCents = goalTargetCents;
+          } else {
+            existing.title = ageOrTitle || 'Administrador Familiar';
+          }
+          existing.updatedAt = new Date().toISOString();
+          document.getElementById('dialogMember')?.close();
+          await this.cloudManager.pushState(this.state);
+          this.renderAll();
+          this.showToast(`Perfil de "${name}" actualizado.`, 'success');
+          return;
+        }
+      }
 
-    this.state.members.push(newMember);
-    if (role === 'CHILD') {
-      this.selectedChildId = newMember.id;
-    }
-    document.getElementById('dialogMember')?.close();
+      const newMember = {
+        id: `${role.toLowerCase()}_${Date.now()}`,
+        familyId: this.state.family.id,
+        role,
+        name,
+        avatar,
+        age: role === 'CHILD' ? Number(ageOrTitle) || 10 : undefined,
+        title: role === 'PARENT' ? ageOrTitle || 'Administrador Familiar' : undefined,
+        themeColor: role === 'CHILD' ? '#10b981' : '#6366f1',
+        goalTitle: role === 'CHILD' ? goalTitle : undefined,
+        goalTargetCents: role === 'CHILD' ? goalTargetCents : undefined,
+        goalIcon: 'target',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-    await this.cloudManager.pushState(this.state);
-    this.renderAll();
-    this.showToast(`Usuario "${name}" (${role === 'PARENT' ? 'Papá/Mamá' : 'Hijo/a'}) creado con icono SVG.`, 'success');
+      this.state.members.push(newMember);
+      if (role === 'CHILD') {
+        this.selectedChildId = newMember.id;
+      }
+      document.getElementById('dialogMember')?.close();
+
+      await this.cloudManager.pushState(this.state);
+      this.renderAll();
+      this.showToast(`Integrante "${name}" agregado a la familia.`, 'success');
+    });
+  }
+
+  async handleDeleteMember(memberId) {
+    await this.runAsParent(async () => {
+      const mem = (this.state.members || []).find((m) => m.id === memberId);
+      if (!mem) return;
+      const children = this.getChildren();
+      if (mem.role === 'CHILD' && children.length <= 1) {
+        this.showToast('Debe quedar al menos 1 alcancía de Hijo/a. Puedes usar "Editar" para cambiarle el nombre.', 'warn');
+        return;
+      }
+      const parents = this.getParents();
+      if (mem.role === 'PARENT' && parents.length <= 1) {
+        this.showToast('Debe quedar al menos 1 cuenta de Papá/Mamá. Puedes usar "Editar" para cambiarle el nombre.', 'warn');
+        return;
+      }
+
+      this.markDeletedId(memberId);
+      this.state.members = (this.state.members || []).filter((m) => m.id !== memberId);
+      if (this.selectedChildId === memberId) {
+        this.selectedChildId = this.getChildren()[0]?.id || null;
+      }
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast(`Integrante "${mem.name}" borrado.`, 'info');
+    });
   }
 
   async submitCatalogForm() {
-    if (!this.ensureParentPermission()) return;
-    const type = document.getElementById('catTypeInput').value;
-    const name = document.getElementById('catNameInput').value.trim();
-    const icon = resolveIconKey(document.getElementById('catIconSelect').value, 'coins');
-    const description = document.getElementById('catDescInput').value.trim();
+    await this.runAsParent(async () => {
+      const editId = (document.getElementById('catEditIdInput')?.value || '').trim();
+      const type = document.getElementById('catTypeInput').value;
+      const name = document.getElementById('catNameInput').value.trim();
+      const icon = resolveIconKey(document.getElementById('catIconSelect').value, 'coins');
+      const description = document.getElementById('catDescInput').value.trim();
 
-    const newCat = {
-      id: `cat_${Date.now()}`,
-      familyId: this.state.family.id,
-      type,
-      name,
-      icon,
-      color: type === 'INCOME_SOURCE' ? '#10b981' : '#f43f5e',
-      description,
-      isActive: true,
-      updatedAt: new Date().toISOString()
-    };
+      if (editId) {
+        const existing = (this.state.catalogs || []).find((c) => c.id === editId);
+        if (existing) {
+          existing.name = name;
+          existing.icon = icon;
+          existing.description = description;
+          existing.updatedAt = new Date().toISOString();
+          document.getElementById('dialogCatalog')?.close();
+          await this.cloudManager.pushState(this.state);
+          this.renderAll();
+          this.showToast(`Categoría "${name}" modificada.`, 'success');
+          return;
+        }
+      }
 
-    this.state.catalogs.push(newCat);
-    document.getElementById('dialogCatalog')?.close();
+      const newCat = {
+        id: `cat_${Date.now()}`,
+        familyId: this.state.family.id,
+        type,
+        name,
+        icon,
+        color: type === 'INCOME_SOURCE' ? '#10b981' : '#f43f5e',
+        description,
+        isActive: true,
+        updatedAt: new Date().toISOString()
+      };
 
-    await this.cloudManager.pushState(this.state);
-    this.renderAll();
-    this.showToast(`"${name}" agregado al catálogo familiar con icono SVG.`, 'success');
+      this.state.catalogs.push(newCat);
+      document.getElementById('dialogCatalog')?.close();
+
+      await this.cloudManager.pushState(this.state);
+      this.renderAll();
+      this.showToast(`"${name}" agregado al catálogo.`, 'success');
+    });
+  }
+
+  async handleDeleteCatalog(catId) {
+    await this.runAsParent(async () => {
+      this.markDeletedId(catId);
+      this.state.catalogs = (this.state.catalogs || []).filter((c) => c.id !== catId);
+      await this.cloudManager.pushState(this.state);
+      this.renderAll();
+      this.showToast('Categoría borrada.', 'info');
+    });
   }
 
   async sendSandboxRequest(requestType) {
@@ -2407,11 +2946,11 @@ class SmartPiggyApp {
         familyId: this.state.family.id,
         memberId: child.id,
         requestType: 'INVESTMENT',
-        title: `Invertir ${formatMoneyCents(amount * 100)} a ${termDays} días (+${ratePercent}%)`,
+        title: `Guardar ${formatMoneyCents(amount * 100)} a ${termDays} días (+${ratePercent}%)`,
         amountCents: amount * 100,
         termDays,
         ratePercent,
-        note: `Solicitud enviada desde el Simulador por ${child.name} para ganar +${formatMoneyCents(Math.round(amount * 100 * (ratePercent / 100)))} al vencimiento.`,
+        note: `Pedido enviado desde la Calculadora por ${child.name} para ganar +${formatMoneyCents(Math.round(amount * 100 * (ratePercent / 100)))} al terminar el plazo.`,
         status: 'PENDING',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -2426,12 +2965,12 @@ class SmartPiggyApp {
         familyId: this.state.family.id,
         memberId: child.id,
         requestType: 'LOAN',
-        title: `Crédito de ${formatMoneyCents(amount * 100)} a ${termPeriods} cuotas (${ratePercent}% ${interestType === 'SIMPLE' ? 'Simple' : 'Compuesto'})`,
+        title: `Préstamo de ${formatMoneyCents(amount * 100)} en ${termPeriods} pagos (${ratePercent}% ${interestType === 'SIMPLE' ? 'Simple' : 'Compuesto'})`,
         amountCents: amount * 100,
         termPeriods,
         ratePercent,
         interestType,
-        note: `Solicitud de préstamo simulada por ${child.name}.`,
+        note: `Pedido de préstamo enviado por ${child.name}.`,
         status: 'PENDING',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -2442,127 +2981,161 @@ class SmartPiggyApp {
     this.state.childRequests.push(newReq);
     await this.cloudManager.pushState(this.state);
     this.renderAll();
-    this.showToast('Solicitud enviada a Mamá/Papá. Ellos la verán al desbloquear el Modo Papá.', 'info');
+    this.showToast('¡Pedido enviado! Papá o Mamá puede tocar "Aprobar Pedido" aquí abajo o en el aviso superior.', 'success');
+  }
+
+  async handleDeleteChildRequest(reqId) {
+    await this.runAsParent(async () => {
+      this.markDeletedId(reqId);
+      this.state.childRequests = (this.state.childRequests || []).filter((r) => r.id !== reqId);
+      await this.cloudManager.pushState(this.state);
+      this.renderAll();
+      this.showToast('Pedido borrado.', 'info');
+    });
   }
 
   async handleProcessChildRequest(reqId, approve = true) {
-    if (!this.ensureParentPermission()) return;
-    const req = (this.state.childRequests || []).find((r) => r.id === reqId && r.status === 'PENDING');
-    if (!req) return;
-
-    if (!approve) {
-      req.status = 'REJECTED';
-      req.updatedAt = new Date().toISOString();
-      await this.cloudManager.pushState(this.state);
-      this.renderAll();
-      this.showToast('Solicitud marcada como rechazada.', 'info');
-      return;
-    }
-
-    const today = getTodayLocalDate();
-    if (req.requestType === 'INVESTMENT') {
-      const childFinance = reduceMemberFinancialState({
-        memberId: req.memberId,
-        validEvents: this.auditResult.validEvents,
-        loans: this.state.loans,
-        investments: this.state.investments,
-        catalogs: this.state.catalogs
-      });
-      if (req.amountCents > childFinance.availableCents) {
-        this.showToast(`El hijo no tiene suficiente saldo disponible (${formatMoneyCents(childFinance.availableCents)}) para esta inversión.`, 'warn');
+    await this.runAsParent(async () => {
+      const req = (this.state.childRequests || []).find((r) => r.id === reqId && r.status === 'PENDING');
+      if (!req) {
+        this.showToast('Este pedido ya fue procesado.', 'info');
         return;
       }
 
-      const newInv = {
-        id: `inv_req_${Date.now()}`,
-        familyId: this.state.family.id,
-        memberId: req.memberId,
-        title: req.title,
-        principalCents: req.amountCents,
-        yieldRatePercent: req.ratePercent || 10,
-        termDays: req.termDays || 30,
-        startDate: today,
-        maturityDate: addDaysLocalDate(today, req.termDays || 30),
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      this.state.investments.push(newInv);
+      if (!approve) {
+        req.status = 'REJECTED';
+        req.updatedAt = new Date().toISOString();
+        await this.cloudManager.pushState(this.state);
+        this.renderAll();
+        this.showToast('Pedido rechazado.', 'info');
+        return;
+      }
 
-      const signedLock = await createSignedLedgerEvent(
-        {
+      const today = getTodayLocalDate();
+      if (req.requestType === 'INVESTMENT') {
+        const childFinance = reduceMemberFinancialState({
+          memberId: req.memberId,
+          validEvents: this.auditResult.validEvents,
+          loans: this.state.loans,
+          investments: this.state.investments,
+          catalogs: this.state.catalogs
+        });
+
+        // Si la alcancía no tiene saldo suficiente para cubrir el ahorro a plazo pedido,
+        // acreditamos automáticamente el faltante como depósito autorizado por Papá/Mamá
+        // para que el botón "Aprobar Pedido" siempre funcione de inmediato.
+        if (req.amountCents > childFinance.availableCents) {
+          const shortfallCents = req.amountCents - Math.max(0, childFinance.availableCents);
+          const signedFunding = await createSignedLedgerEvent(
+            {
+              familyId: this.state.family.id,
+              memberId: req.memberId,
+              createdByParentId: this.activeParentId,
+              type: 'INCOME',
+              amountCents: shortfallCents,
+              catalogId: 'cat_inc_allowance',
+              note: `Depósito de Papá/Mamá para completar el ahorro a plazo: ${req.title}`,
+              localDate: today
+            },
+            this.parentSigningKey,
+            this.state.family.saltHex,
+            this.getLastEventHash()
+          );
+          this.state.ledgerEvents.push(signedFunding);
+        }
+
+        const newInv = {
+          id: `inv_req_${Date.now()}`,
           familyId: this.state.family.id,
           memberId: req.memberId,
-          createdByParentId: this.activeParentId,
-          type: 'INVESTMENT_LOCK',
-          amountCents: req.amountCents,
-          catalogId: 'cat_inc_yield',
-          referenceId: newInv.id,
-          note: `Inversión aprobada por Papá desde solicitud de Simulador: ${req.title}`,
-          localDate: today
-        },
-        this.parentSigningKey,
-        this.state.family.saltHex,
-        this.getLastEventHash()
-      );
-      this.state.ledgerEvents.push(signedLock);
-    } else if (req.requestType === 'LOAN') {
-      const plan = generateLoanSchedule({
-        principalCents: req.amountCents,
-        interestRatePercent: req.ratePercent || 5,
-        termPeriods: req.termPeriods || 4,
-        interestType: req.interestType || 'SIMPLE',
-        frequency: 'WEEKLY',
-        startDate: today
-      });
+          title: req.title,
+          principalCents: req.amountCents,
+          yieldRatePercent: req.ratePercent || 10,
+          termDays: req.termDays || 30,
+          startDate: today,
+          maturityDate: addDaysLocalDate(today, req.termDays || 30),
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        this.state.investments.push(newInv);
 
-      const newLoan = {
-        id: `loan_req_${Date.now()}`,
-        familyId: this.state.family.id,
-        memberId: req.memberId,
-        concept: req.title,
-        principalCents: plan.principalCents,
-        interestType: req.interestType || 'SIMPLE',
-        interestRatePercent: req.ratePercent || 5,
-        termPeriods: req.termPeriods || 4,
-        frequency: 'WEEKLY',
-        disbursedToPiggy: true,
-        totalInterestCents: plan.totalInterestCents,
-        totalPayableCents: plan.totalPayableCents,
-        interestSavedByExtraPaymentsCents: 0,
-        schedule: plan.schedule,
-        startDate: today,
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      this.state.loans.push(newLoan);
+        const signedLock = await createSignedLedgerEvent(
+          {
+            familyId: this.state.family.id,
+            memberId: req.memberId,
+            createdByParentId: this.activeParentId,
+            type: 'INVESTMENT_LOCK',
+            amountCents: req.amountCents,
+            catalogId: 'cat_inc_yield',
+            referenceId: newInv.id,
+            note: `Ahorro a Plazo aprobado desde Calculadora: ${req.title}`,
+            localDate: today
+          },
+          this.parentSigningKey,
+          this.state.family.saltHex,
+          this.getLastEventHash()
+        );
+        this.state.ledgerEvents.push(signedLock);
+      } else if (req.requestType === 'LOAN') {
+        const plan = generateLoanSchedule({
+          principalCents: req.amountCents,
+          interestRatePercent: req.ratePercent || 5,
+          termPeriods: req.termPeriods || 4,
+          interestType: req.interestType || 'SIMPLE',
+          frequency: 'WEEKLY',
+          startDate: today
+        });
 
-      const signedDisb = await createSignedLedgerEvent(
-        {
+        const newLoan = {
+          id: `loan_req_${Date.now()}`,
           familyId: this.state.family.id,
           memberId: req.memberId,
-          createdByParentId: this.activeParentId,
-          type: 'LOAN_DISBURSEMENT',
-          amountCents: req.amountCents,
-          catalogId: 'cat_exp_loan',
-          referenceId: newLoan.id,
-          metadata: { disbursedToPiggy: true },
-          note: `Crédito aprobado por Papá desde solicitud de Simulador: ${req.title}`,
-          localDate: today
-        },
-        this.parentSigningKey,
-        this.state.family.saltHex,
-        this.getLastEventHash()
-      );
-      this.state.ledgerEvents.push(signedDisb);
-    }
+          concept: req.title,
+          principalCents: plan.principalCents,
+          interestType: req.interestType || 'SIMPLE',
+          interestRatePercent: req.ratePercent || 5,
+          termPeriods: req.termPeriods || 4,
+          frequency: 'WEEKLY',
+          disbursedToPiggy: true,
+          totalInterestCents: plan.totalInterestCents,
+          totalPayableCents: plan.totalPayableCents,
+          interestSavedByExtraPaymentsCents: 0,
+          schedule: plan.schedule,
+          startDate: today,
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        this.state.loans.push(newLoan);
 
-    req.status = 'APPROVED';
-    req.updatedAt = new Date().toISOString();
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast('Solicitud aprobada, ejecutada y firmada en el Libro Mayor.', 'success');
+        const signedDisb = await createSignedLedgerEvent(
+          {
+            familyId: this.state.family.id,
+            memberId: req.memberId,
+            createdByParentId: this.activeParentId,
+            type: 'LOAN_DISBURSEMENT',
+            amountCents: req.amountCents,
+            catalogId: 'cat_exp_loan',
+            referenceId: newLoan.id,
+            metadata: { disbursedToPiggy: true },
+            note: `Préstamo aprobado desde Calculadora: ${req.title}`,
+            localDate: today
+          },
+          this.parentSigningKey,
+          this.state.family.saltHex,
+          this.getLastEventHash()
+        );
+        this.state.ledgerEvents.push(signedDisb);
+      }
+
+      req.status = 'APPROVED';
+      req.updatedAt = new Date().toISOString();
+      this.selectedChildId = req.memberId;
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast('¡Pedido aprobado y aplicado en la alcancía!', 'success');
+    });
   }
 
   scheduleAutoCloudReconnect() {
@@ -2812,43 +3385,58 @@ class SmartPiggyApp {
   }
 
   async updateParentPinAndResign() {
-    if (!this.ensureParentPermission()) return;
-    const newPin = document.getElementById('newParentPinInput').value.trim();
-    if (newPin.length < 4) {
-      this.showToast('El nuevo PIN debe tener al menos 4 dígitos.', 'warn');
-      return;
-    }
+    await this.runAsParent(async () => {
+      const newPin = document.getElementById('newParentPinInput').value.trim();
+      if (newPin.length < 4) {
+        this.showToast('El nuevo PIN debe tener al menos 4 dígitos.', 'warn');
+        return;
+      }
 
-    const newSalt = generateSaltHex(16);
-    const { authVerifier, signingKey } = await deriveParentKeyBundle(newPin, newSalt);
-    this.state.family.saltHex = newSalt;
-    this.state.family.authVerifier = authVerifier;
-    this.state.family.updatedAt = new Date().toISOString();
-    this.parentSigningKey = signingKey;
+      const newSalt = generateSaltHex(16);
+      const { authVerifier, signingKey } = await deriveParentKeyBundle(newPin, newSalt);
+      this.state.family.saltHex = newSalt;
+      this.state.family.authVerifier = authVerifier;
+      this.state.family.updatedAt = new Date().toISOString();
+      this.parentSigningKey = signingKey;
 
-    const reSigned = [];
-    let prevHash = 'GENESIS';
-    for (const ev of this.auditResult.validEvents) {
-      const signed = await createSignedLedgerEvent(ev, signingKey, newSalt, prevHash);
-      prevHash = signed.eventHash;
-      reSigned.push(signed);
-    }
-    this.state.ledgerEvents = reSigned;
-    document.getElementById('newParentPinInput').value = '';
+      await this.reSignLedgerChain();
+      document.getElementById('newParentPinInput').value = '';
 
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast('PIN Parental actualizado y Libro Mayor re-firmado con PBKDF2 (210,000 iteraciones).', 'success');
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast('PIN de Papá/Mamá actualizado y movimientos protegidos.', 'success');
+    });
   }
 
   async resetToInitialDemoData() {
-    if (!this.ensureParentPermission()) return;
-    this.state = await buildInitialSignedFamilyState(this.state.family.familyCode);
-    const { signingKey } = await deriveParentKeyBundle('1234', this.state.family.saltHex);
-    this.parentSigningKey = signingKey;
-    await this.cloudManager.pushState(this.state);
-    await this.runLedgerAuditAndRender();
-    this.showToast('Datos demostrativos restaurados con iconografía 100% SVG (PIN: 1234).', 'info');
+    await this.runAsParent(async () => {
+      const prevSalt = this.state?.family?.saltHex;
+      const prevVerifier = this.state?.family?.authVerifier;
+      const prevFamilyCode = this.state?.family?.familyCode || 'FAM-2026-KIDS';
+
+      const allOldIds = new Set(Array.isArray(this.state?.family?.deletedIds) ? this.state.family.deletedIds : []);
+      for (const col of ['ledgerEvents', 'loans', 'investments', 'recurringRules', 'childRequests']) {
+        (this.state?.[col] || []).forEach((item) => {
+          if (item?.id) allOldIds.add(item.id);
+        });
+      }
+
+      const cleanState = await buildInitialSignedFamilyState(prevFamilyCode);
+      if (prevSalt && prevVerifier) {
+        cleanState.family.saltHex = prevSalt;
+        cleanState.family.authVerifier = prevVerifier;
+      }
+      cleanState.family.resetEpoch = Date.now();
+      cleanState.family.deletedIds = Array.from(allOldIds);
+      cleanState.family.updatedAt = new Date().toISOString();
+
+      this.state = cleanState;
+      this.selectedChildId = 'child_principal';
+
+      await this.cloudManager.pushState(this.state);
+      await this.runLedgerAuditAndRender();
+      this.showToast('¡Todos los datos fueron borrados! Tu alcancía empieza limpia en $0.00.', 'success');
+    });
   }
 
   async simulateChildTamperAttack() {

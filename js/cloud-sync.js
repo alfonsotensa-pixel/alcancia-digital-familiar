@@ -10,24 +10,115 @@
  *    - Respaldo simultáneo en `BroadcastChannel` multi-ventana y servidor local `/api/cloud/:familyCode`.
  */
 
-const STORAGE_KEY_PREFIX = 'smartpiggy_cloud_state_v2_';
+const STORAGE_KEY_PREFIX = 'smartpiggy_cloud_state_v3_';
 const CLOUD_CONFIG_KEY = 'smartpiggy_cloud_provider_config_v2';
 
-function mergeEntityCollection(localArr = [], remoteArr = [], immutable = false) {
+const LEGACY_DEMO_IDS = new Set([
+  'child_sofia',
+  'child_mateo',
+  'parent_carlos',
+  'parent_elena',
+  'loan_sofia_artset',
+  'loan_mateo_headphones',
+  'inv_sofia_30d',
+  'inv_mateo_60d',
+  'rec_sofia_weekly',
+  'rec_mateo_biweekly',
+  'req_sofia_inv_01'
+]);
+
+function isLegacyDemoId(id = '') {
+  const s = String(id || '');
+  return (
+    LEGACY_DEMO_IDS.has(s) ||
+    s.startsWith('tx_seed_') ||
+    s.startsWith('det_rec_rec_sofia_') ||
+    s.startsWith('det_rec_rec_mateo_')
+  );
+}
+
+/**
+ * Elimina cualquier registro demostrativo antiguo que haya quedado en localStorage o en Supabase
+ * y garantiza que exista al menos un perfil Padre y un perfil Hijo limpio ($0.00).
+ */
+export function stripLegacyDemoData(state) {
+  if (!state || !state.family) return state;
+
+  const nowIso = new Date().toISOString();
+  state.family.deletedIds = state.family.deletedIds || {};
+  if (state.family.name === 'Familia García-Mendoza') {
+    state.family.name = 'Mi Familia';
+  }
+
+  const filterDemo = (arr = []) =>
+    (arr || []).filter(
+      (item) =>
+        item &&
+        item.id &&
+        !isLegacyDemoId(item.id) &&
+        !isLegacyDemoId(item.memberId) &&
+        !state.family.deletedIds[item.id]
+    );
+
+  state.members = filterDemo(state.members);
+  state.catalogs = (state.catalogs || []).filter((c) => c && c.id && !state.family.deletedIds[c.id]);
+  state.recurringRules = filterDemo(state.recurringRules);
+  state.loans = filterDemo(state.loans);
+  state.investments = filterDemo(state.investments);
+  state.childRequests = filterDemo(state.childRequests);
+  state.ledgerEvents = filterDemo(state.ledgerEvents);
+
+  if (!state.members.some((m) => m.role === 'PARENT')) {
+    state.members.unshift({
+      id: 'parent_admin',
+      familyId: state.family.id,
+      role: 'PARENT',
+      name: 'Papá / Mamá',
+      title: 'Administrador Familiar',
+      avatar: 'parent-male',
+      themeColor: '#6366f1',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    });
+  }
+
+  if (!state.members.some((m) => m.role === 'CHILD')) {
+    state.members.push({
+      id: 'child_principal',
+      familyId: state.family.id,
+      role: 'CHILD',
+      name: 'Mi Alcancía',
+      age: 10,
+      avatar: 'piggy',
+      themeColor: '#10b981',
+      goalTitle: 'Mi Meta de Ahorro',
+      goalTargetCents: 100000,
+      goalIcon: 'target',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    });
+  }
+
+  return state;
+}
+
+function mergeEntityCollection(localArr = [], remoteArr = [], deletedIdsMap = {}) {
   const map = new Map();
 
   for (const item of localArr) {
-    if (item && item.id) {
+    if (item && item.id && !deletedIdsMap[item.id] && !isLegacyDemoId(item.id) && !isLegacyDemoId(item.memberId)) {
       map.set(item.id, item);
     }
   }
 
   for (const rItem of remoteArr) {
-    if (!rItem || !rItem.id) continue;
+    if (!rItem || !rItem.id || deletedIdsMap[rItem.id] || isLegacyDemoId(rItem.id) || isLegacyDemoId(rItem.memberId)) {
+      continue;
+    }
     const existing = map.get(rItem.id);
     if (!existing) {
       map.set(rItem.id, rItem);
-    } else if (!immutable) {
+    } else {
       const localTime = String(existing.updatedAt || existing.createdAt || '');
       const remoteTime = String(rItem.updatedAt || rItem.createdAt || '');
       if (remoteTime >= localTime) {
@@ -40,30 +131,47 @@ function mergeEntityCollection(localArr = [], remoteArr = [], immutable = false)
 }
 
 /**
- * Fusión CRDT determinista, conmutativa, asociativa e idempotente entre el estado local y el estado remoto.
+ * Fusión CRDT determinista con soporte para Tombstones (`deletedIds`), `resetEpoch` y limpieza de datos de prueba.
  */
 export function mergeFamilyCRDT(localState, remoteState) {
-  if (!remoteState || !remoteState.family) return localState;
-  if (!localState || !localState.family) return remoteState;
+  if (!remoteState || !remoteState.family) return stripLegacyDemoData(localState);
+  if (!localState || !localState.family) return stripLegacyDemoData(remoteState);
 
-  const localFamUpdated = String(localState.family.updatedAt || '');
-  const remoteFamUpdated = String(remoteState.family.updatedAt || '');
+  const cleanLocal = stripLegacyDemoData(localState);
+  const cleanRemote = stripLegacyDemoData(remoteState);
+
+  const localEpoch = Number(cleanLocal.family.resetEpoch || 0);
+  const remoteEpoch = Number(cleanRemote.family.resetEpoch || 0);
+  if (localEpoch > remoteEpoch && remoteEpoch > 0) {
+    return cleanLocal;
+  }
+  if (remoteEpoch > localEpoch && localEpoch > 0) {
+    return cleanRemote;
+  }
+
+  const mergedDeletedIds = {
+    ...(cleanLocal.family.deletedIds || {}),
+    ...(cleanRemote.family.deletedIds || {})
+  };
+
+  const localFamUpdated = String(cleanLocal.family.updatedAt || '');
+  const remoteFamUpdated = String(cleanRemote.family.updatedAt || '');
   const mergedFamily =
     remoteFamUpdated >= localFamUpdated
-      ? { ...localState.family, ...remoteState.family }
-      : { ...remoteState.family, ...localState.family };
+      ? { ...cleanLocal.family, ...cleanRemote.family, deletedIds: mergedDeletedIds, resetEpoch: Math.max(localEpoch, remoteEpoch) }
+      : { ...cleanRemote.family, ...cleanLocal.family, deletedIds: mergedDeletedIds, resetEpoch: Math.max(localEpoch, remoteEpoch) };
 
-  return {
+  return stripLegacyDemoData({
     family: mergedFamily,
-    members: mergeEntityCollection(localState.members, remoteState.members, false),
-    catalogs: mergeEntityCollection(localState.catalogs, remoteState.catalogs, false),
-    recurringRules: mergeEntityCollection(localState.recurringRules, remoteState.recurringRules, false),
-    loans: mergeEntityCollection(localState.loans, remoteState.loans, false),
-    investments: mergeEntityCollection(localState.investments, remoteState.investments, false),
-    childRequests: mergeEntityCollection(localState.childRequests, remoteState.childRequests, false),
-    ledgerEvents: mergeEntityCollection(localState.ledgerEvents, remoteState.ledgerEvents, true),
+    members: mergeEntityCollection(cleanLocal.members, cleanRemote.members, mergedDeletedIds),
+    catalogs: mergeEntityCollection(cleanLocal.catalogs, cleanRemote.catalogs, mergedDeletedIds),
+    recurringRules: mergeEntityCollection(cleanLocal.recurringRules, cleanRemote.recurringRules, mergedDeletedIds),
+    loans: mergeEntityCollection(cleanLocal.loans, cleanRemote.loans, mergedDeletedIds),
+    investments: mergeEntityCollection(cleanLocal.investments, cleanRemote.investments, mergedDeletedIds),
+    childRequests: mergeEntityCollection(cleanLocal.childRequests, cleanRemote.childRequests, mergedDeletedIds),
+    ledgerEvents: mergeEntityCollection(cleanLocal.ledgerEvents, cleanRemote.ledgerEvents, mergedDeletedIds),
     lastSyncedAt: new Date().toISOString()
-  };
+  });
 }
 
 export class CloudSyncManager {
@@ -131,8 +239,12 @@ export class CloudSyncManager {
   loadLocalState(familyCode = this.familyCode) {
     this.familyCode = String(familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
     try {
+      // Limpiar versiones previas que contenían datos de prueba
+      localStorage.removeItem(`smartpiggy_cloud_state_v2_${this.familyCode}`);
       const raw = localStorage.getItem(this.getStorageKey(this.familyCode));
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        return stripLegacyDemoData(JSON.parse(raw));
+      }
     } catch {
       // ignore
     }
