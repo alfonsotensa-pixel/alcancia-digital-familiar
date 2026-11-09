@@ -53,11 +53,46 @@ function annualizedPct(bps, termDays) {
 
 export function installRulesFeatures(AppClass) {
   const methods = {
-    /* ----------------------------------------------------------------------
-       Utilidades de configuración
+  /* ----------------------------------------------------------------------
+       Utilidades de configuración (montos parejos sin distinción por edad)
        ---------------------------------------------------------------------- */
     getMemberBand(member) {
       return getAgeBand(member?.age);
+    },
+
+    getTaskRewardCents(task) {
+      if (!task || task.kind !== 'EXTRA') return 0;
+      if (Number.isFinite(Number(task.rewardCents)) && Number(task.rewardCents) > 0) {
+        return Math.round(Number(task.rewardCents));
+      }
+      return Math.max(Number(task.rewardByBand?.['13_17'] || 0), Number(task.rewardByBand?.['9_12'] || 0));
+    },
+
+    getPresetAmountCents(preset) {
+      if (!preset) return 0;
+      if (Number.isFinite(Number(preset.amountCents)) && Number(preset.amountCents) > 0) {
+        return Math.round(Number(preset.amountCents));
+      }
+      return Math.max(Number(preset.amountByBand?.['13_17'] || 0), Number(preset.amountByBand?.['9_12'] || 0));
+    },
+
+    getPlanYieldBps(plan) {
+      if (!plan) return 0;
+      if (Number.isFinite(Number(plan.yieldBps)) && Number(plan.yieldBps) > 0) {
+        return Math.round(Number(plan.yieldBps));
+      }
+      return Math.max(Number(plan.yieldBpsByBand?.['13_17'] || 0), Number(plan.yieldBpsByBand?.['9_12'] || 0));
+    },
+
+    getFineLevelBounds(level) {
+      const raw = FINE_LEVEL_LIMITS[level];
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw === 'object') {
+        const min = Math.min(Number(raw['9_12']?.[0] || 500), Number(raw['13_17']?.[0] || 500));
+        const max = Math.max(Number(raw['9_12']?.[1] || 2000), Number(raw['13_17']?.[1] || 2000));
+        return [min, max];
+      }
+      return [500, 20000];
     },
 
     getRulesConfig() {
@@ -88,7 +123,7 @@ export function installRulesFeatures(AppClass) {
       if (Array.isArray(task.eligibleMemberIds) && task.eligibleMemberIds.length > 0 && !task.eligibleMemberIds.includes(member.id)) {
         return false;
       }
-      if (task.kind === 'EXTRA' && Number(task.rewardByBand?.[this.getMemberBand(member)] || 0) <= 0) return false;
+      if (task.kind === 'EXTRA' && this.getTaskRewardCents(task) <= 0) return false;
       return true;
     },
 
@@ -182,7 +217,7 @@ export function installRulesFeatures(AppClass) {
           : toReview
               .map(({ b, a }) => {
                 const m = memberById.get(a.memberId) || { name: 'Hijo/a' };
-                const amount = b.task.kind === 'EXTRA' ? Number(b.task.rewardByBand?.[this.getMemberBand(m)] || 0) : 0;
+                const amount = this.getTaskRewardCents(b.task);
                 return `
                 <div class="tx-item">
                   <div class="tx-left">
@@ -207,7 +242,6 @@ export function installRulesFeatures(AppClass) {
       // 2) Tareas abiertas
       const open = board.filter((b) => b.isOpen);
       const closed = board.filter((b) => !b.isOpen);
-      const band = this.getMemberBand(child);
 
       container.innerHTML =
         open.length === 0
@@ -215,7 +249,7 @@ export function installRulesFeatures(AppClass) {
           : open
               .map((b) => {
                 const t = b.task;
-                const reward = Number(t.rewardByBand?.[band] || 0);
+                const reward = this.getTaskRewardCents(t);
                 const eligible = this.isTaskEligible(t, child);
                 const mine = b.assignments.find((a) => a.memberId === child.id);
                 const slotsText = b.slotsTotal === Infinity ? 'Para todos' : `Quedan ${b.slotsLeft} de ${b.slotsTotal}`;
@@ -259,10 +293,9 @@ export function installRulesFeatures(AppClass) {
                       ${t.kind === 'EXTRA' ? (reward > 0 ? `+${formatMoneyCents(reward, currency)}` : '—') : 'Sin pago'}
                     </div>
                     <span class="inline-icon-text" style="font-size: 0.8rem; color: var(--text-secondary);">
-                      ${renderSvgIcon('calendar', 13)} Hasta el ${esc(t.dueDate)} · ${t.unit === 'WEEK' ? 'por semana' : 'una vez'}
+                      ${renderSvgIcon('calendar', 13)} ${t.dueDate ? `Hasta el ${esc(t.dueDate)}` : 'Abierta'} · ${t.unit === 'WEEK' ? 'por semana' : 'una vez'}
                     </span>
                   </div>
-                  ${t.kind === 'EXTRA' ? `<p style="margin: 0 0 0.5rem 0; font-size: 0.75rem; color: var(--text-muted);">Pago 9–12: ${formatMoneyCents(t.rewardByBand?.['9_12'] || 0, currency)} · 13–17: ${formatMoneyCents(t.rewardByBand?.['13_17'] || 0, currency)}</p>` : ''}
                   <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.65rem;">${chips}</div>
                   <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
                     ${childAction}
@@ -292,7 +325,7 @@ export function installRulesFeatures(AppClass) {
                     <div class="tx-icon">${renderSvgIcon(t.iconKey || 'checklist', 20)}</div>
                     <div>
                       <p class="tx-title">${esc(t.title)}</p>
-                      <p class="tx-sub">Cerró el ${esc(t.dueDate)} · ${approved.length > 0 ? `La hicieron: ${names}` : 'Nadie la terminó'}</p>
+                      <p class="tx-sub">${t.dueDate ? `Cerró el ${esc(t.dueDate)}` : 'Cerrada'} · ${approved.length > 0 ? `La hicieron: ${names}` : 'Nadie la terminó'}</p>
                     </div>
                   </div>
                   <div class="tx-right" style="gap: 0.35rem; flex-wrap: wrap;">
@@ -314,17 +347,16 @@ export function installRulesFeatures(AppClass) {
       const capEl = document.getElementById('fineCapInfoBox');
       if (!presetsEl || !finesEl) return;
 
-      const band = this.getMemberBand(child);
       const cfg = this.getRulesConfig();
 
       if (capEl) {
-        const fixedCap = Number(cfg.fineMonthlyCapByBand?.[band] || 0);
-        const minCap = Number(cfg.fineMinCapByBand?.[band] || 0);
+        const fixedCap = Number(cfg.fineMonthlyCapCents ?? cfg.fineMonthlyCapByBand?.['13_17'] ?? 15000);
+        const minCap = Number(cfg.fineMinCapCents ?? cfg.fineMinCapByBand?.['13_17'] ?? 1000);
         const pctCap = Math.floor((childFinance.income30Cents * Number(cfg.fineIncomePct || 25)) / 100);
         const cap = Math.min(fixedCap, Math.max(minCap, pctCap));
         capEl.innerHTML = `
           ${renderSvgIcon('shield-check', 18)}
-          <span><strong>Protección para ${esc(child.name)} (${BAND_LABEL[band]}):</strong>
+          <span><strong>Protección para ${esc(child.name)}:</strong>
           en 30 días las multas no pueden pasar de <strong>${formatMoneyCents(cap, currency)}</strong>
           (el menor entre ${formatMoneyCents(fixedCap, currency)} y el ${cfg.fineIncomePct}% de lo que recibió: ${formatMoneyCents(childFinance.income30Cents, currency)}).
           Ya usado: <strong>${formatMoneyCents(childFinance.fines30Cents, currency)}</strong>. Una multa nunca deja tu alcancía en negativo.</span>`;
@@ -343,8 +375,9 @@ export function installRulesFeatures(AppClass) {
             </h4>
             <div class="tx-list">
               ${items
-                .map(
-                  (p) => `
+                .map((p) => {
+                  const amount = this.getPresetAmountCents(p);
+                  return `
                 <div class="tx-item">
                   <div class="tx-left">
                     <div class="tx-icon" style="color: ${meta.color};">${renderSvgIcon(p.iconKey || 'scale', 20)}</div>
@@ -352,7 +385,7 @@ export function installRulesFeatures(AppClass) {
                       <p class="tx-title">${esc(p.title)}</p>
                       <p class="tx-sub">${esc(p.description || '')}</p>
                       <p class="tx-sub" style="font-family: var(--font-mono);">
-                        ${p.kind === 'REPAIR' ? 'Reparación: 50% del costo · tope ' : ''}9–12: ${formatMoneyCents(p.amountByBand?.['9_12'] || 0, currency)} · 13–17: ${formatMoneyCents(p.amountByBand?.['13_17'] || 0, currency)}
+                        ${p.kind === 'REPAIR' ? `Reparación: 50% del costo (tope ${formatMoneyCents(amount, currency)})` : `Multa: ${formatMoneyCents(amount, currency)}`}
                       </p>
                     </div>
                   </div>
@@ -361,8 +394,8 @@ export function installRulesFeatures(AppClass) {
                     <button type="button" class="btn btn-ghost btn-sm" data-fine-preset-edit="${p.id}">${renderSvgIcon('edit', 14)} Editar</button>
                     <button type="button" class="btn btn-ghost btn-sm" data-fine-preset-delete="${p.id}" style="color: var(--color-expense);">${renderSvgIcon('trash', 14)} Borrar</button>
                   </div>
-                </div>`
-                )
+                </div>`;
+                })
                 .join('')}
             </div>
           </div>`;
@@ -426,12 +459,12 @@ export function installRulesFeatures(AppClass) {
     renderInvestmentPlansPanel(child, currency) {
       const el = document.getElementById('investmentPlansContainer');
       if (!el) return;
-      const band = this.getMemberBand(child);
       const cfg = this.getRulesConfig();
-      const cap = Number(cfg.investCapByBand?.[band] || 0);
+      const cap = Number(cfg.investCapCents ?? cfg.investCapByBand?.['13_17'] ?? 250000);
       el.innerHTML = this.getInvestmentPlans()
         .map((p) => {
-          const bps = Number(p.yieldBpsByBand?.[band] || 0);
+          const bps = this.getPlanYieldBps(p);
+          const ratePct = (bps / 100).toFixed(2);
           const example = 10000;
           const exampleGain = Math.floor((example * bps) / 10000);
           const capGain = Math.floor((cap * bps) / 10000);
@@ -441,10 +474,13 @@ export function installRulesFeatures(AppClass) {
               : 'Si lo sacas antes (después de 30 días): recuperas lo que pusiste + la mitad de lo ganado.';
           return `
           <div class="panel-card" style="margin-bottom: 0; background: var(--bg-elevated); border-top: 3px solid var(--color-invest);">
-            <h3 class="inline-icon-text" style="margin: 0 0 0.3rem 0; font-size: 1.05rem;">
-              <span style="color: var(--color-income); display: flex;">${renderSvgIcon(PLAN_ICONS[p.id] || 'trending-up', 22)}</span>
-              <span>${esc(p.label)}</span>
-            </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+              <h3 class="inline-icon-text" style="margin: 0; font-size: 1.05rem;">
+                <span style="color: var(--color-income); display: flex;">${renderSvgIcon(PLAN_ICONS[p.id] || 'trending-up', 22)}</span>
+                <span>${esc(p.label)}</span>
+              </h3>
+              <span class="badge badge-success">+${ratePct}%</span>
+            </div>
             <p style="margin: 0 0 0.4rem 0; font-size: 0.82rem; color: var(--text-secondary);">${p.termDays} días · mínimo ${formatMoneyCents(p.minPrincipalCents, currency)}</p>
             <div style="font-size: 1.02rem; font-weight: 800; margin-bottom: 0.35rem;">
               Si guardas ${formatMoneyCents(example, currency)}, recibes <span style="color: var(--color-income);">${formatMoneyCents(example + exampleGain, currency)}</span>
@@ -463,7 +499,7 @@ export function installRulesFeatures(AppClass) {
 
       const note = document.getElementById('investmentPlansNote');
       if (note) {
-        note.textContent = `Tasas para ${child.name} (${BAND_LABEL[band]}). Tope total guardado a plazo: ${formatMoneyCents(cap, currency)}. Las tasas las fijan Papá y Mamá; cada ahorro conserva la tasa del día en que se creó.`;
+        note.textContent = `Tasa igual para todos los hijos. Tope total guardado a plazo: ${formatMoneyCents(cap, currency)}. Las tasas las fijan Papá y Mamá; cada ahorro conserva la tasa del día en que se creó.`;
       }
     },
 
@@ -481,7 +517,7 @@ export function installRulesFeatures(AppClass) {
               (kind) =>
                 `<optgroup label="${kind === 'EXTRA' ? 'Extras con pago' : 'Responsabilidades (sin pago)'}">` +
                 TASK_TEMPLATES.filter((t) => t.kind === kind)
-                  .map((t) => `<option value="${t.id}">${esc(t.title)}</option>`)
+                  .map((t) => `<option value="${t.id}">${esc(t.title)}${t.kind === 'EXTRA' ? ` (+${formatMoneyCents(t.rewardCents || 0)})` : ''}</option>`)
                   .join('') +
                 `</optgroup>`
             )
@@ -492,7 +528,7 @@ export function installRulesFeatures(AppClass) {
             (c) => `
             <label class="inline-icon-text" style="font-size: 0.86rem; gap: 0.35rem;">
               <input type="checkbox" value="${c.id}" class="task-eligible-check" ${!task || !task.eligibleMemberIds?.length || task.eligibleMemberIds.includes(c.id) ? 'checked' : ''} />
-              ${esc(c.name)} (${c.age || 10})
+              ${esc(c.name)}
             </label>`
           )
           .join('');
@@ -509,7 +545,8 @@ export function installRulesFeatures(AppClass) {
             description: '',
             iconKey: 'star',
             unit: 'ONCE',
-            rewardByBand: { '9_12': 2000, '13_17': 3000 },
+            rewardCents: 3500,
+            rewardByBand: { '9_12': 3500, '13_17': 3500 },
             maxAssignees: 1,
             dueDate: addDaysLocalDate(getTodayLocalDate(), 7)
           }
@@ -524,20 +561,29 @@ export function installRulesFeatures(AppClass) {
       document.getElementById('taskDescInput').value = t.description || '';
       document.getElementById('taskIconSelect').value = TASK_ICON_KEYS.includes(t.iconKey) ? t.iconKey : 'star';
       document.getElementById('taskUnitSelect').value = t.unit || 'ONCE';
-      document.getElementById('taskReward912Input').value = ((t.rewardByBand?.['9_12'] || 0) / 100).toFixed(0);
-      document.getElementById('taskReward1317Input').value = ((t.rewardByBand?.['13_17'] || 0) / 100).toFixed(0);
+      const rewardDollars = (this.getTaskRewardCents(t) / 100).toFixed(0);
+      const rewardInput = document.getElementById('taskRewardInput');
+      if (rewardInput) rewardInput.value = rewardDollars;
+      const r912 = document.getElementById('taskReward912Input');
+      if (r912) r912.value = rewardDollars;
+      const r1317 = document.getElementById('taskReward1317Input');
+      if (r1317) r1317.value = rewardDollars;
       const slots = t.maxAssignees === null || t.maxAssignees === undefined ? 'ALL' : String(t.maxAssignees);
       document.getElementById('taskSlotsSelect').value = ['1', '2', '3', 'ALL'].includes(slots) ? slots : '1';
-      if (t.dueDate) document.getElementById('taskDueDateInput').value = t.dueDate;
+      document.getElementById('taskDueDateInput').value = t.dueDate || addDaysLocalDate(getTodayLocalDate(), 7);
       this.syncTaskKindUi();
     },
 
     syncTaskKindUi() {
       const isExtra = document.getElementById('taskKindSelect').value === 'EXTRA';
-      document.getElementById('taskRewardGroup912').style.display = isExtra ? '' : 'none';
-      document.getElementById('taskRewardGroup1317').style.display = isExtra ? '' : 'none';
+      const gSingle = document.getElementById('taskRewardGroup');
+      if (gSingle) gSingle.style.display = isExtra ? '' : 'none';
+      const g912 = document.getElementById('taskRewardGroup912');
+      if (g912) g912.style.display = isExtra ? '' : 'none';
+      const g1317 = document.getElementById('taskRewardGroup1317');
+      if (g1317) g1317.style.display = isExtra ? '' : 'none';
       document.getElementById('taskKindHint').textContent = isExtra
-        ? 'Extra con pago: algo adicional a las responsabilidades de casa.'
+        ? 'Extra con pago: el mismo pago parejo para quien la realice.'
         : 'Responsabilidad: parte de vivir en familia. Se registra y se aprueba, pero no se paga.';
     },
 
@@ -546,8 +592,8 @@ export function installRulesFeatures(AppClass) {
         const editId = document.getElementById('taskEditIdInput').value.trim();
         const kind = document.getElementById('taskKindSelect').value;
         const title = document.getElementById('taskTitleInput').value.trim();
-        const r912 = kind === 'EXTRA' ? toCents(document.getElementById('taskReward912Input').value || 0) : 0;
-        const r1317 = kind === 'EXTRA' ? toCents(document.getElementById('taskReward1317Input').value || 0) : 0;
+        const rawReward = document.getElementById('taskRewardInput')?.value ?? document.getElementById('taskReward912Input')?.value ?? 0;
+        const rewardCents = kind === 'EXTRA' ? toCents(rawReward) : 0;
         const slotsVal = document.getElementById('taskSlotsSelect').value;
         const dueDate = document.getElementById('taskDueDateInput').value || addDaysLocalDate(getTodayLocalDate(), 7);
         const eligibleMemberIds = Array.from(document.querySelectorAll('.task-eligible-check'))
@@ -558,12 +604,9 @@ export function installRulesFeatures(AppClass) {
           this.showToast('Escribe el nombre de la tarea.', 'warn');
           return;
         }
-        if (kind === 'EXTRA') {
-          const bad = [r912, r1317].some((v) => v !== 0 && (v < 100 || v > 50000));
-          if (bad || (r912 === 0 && r1317 === 0)) {
-            this.showToast('El pago de una tarea extra debe ser de $1 a $500 (pon $0 en una edad si no aplica).', 'warn');
-            return;
-          }
+        if (kind === 'EXTRA' && (rewardCents < 100 || rewardCents > 50000)) {
+          this.showToast('El pago de una tarea extra debe ser de $1 a $500.', 'warn');
+          return;
         }
         if (dueDate > addDaysLocalDate(getTodayLocalDate(), 90)) {
           this.showToast('La fecha límite debe ser dentro de los próximos 90 días.', 'warn');
@@ -581,7 +624,8 @@ export function installRulesFeatures(AppClass) {
           description: document.getElementById('taskDescInput').value.trim(),
           iconKey: document.getElementById('taskIconSelect').value,
           unit: document.getElementById('taskUnitSelect').value,
-          rewardByBand: { '9_12': r912, '13_17': r1317 },
+          rewardCents,
+          rewardByBand: { '9_12': rewardCents, '13_17': rewardCents },
           maxAssignees: slotsVal === 'ALL' ? null : Number(slotsVal),
           eligibleMemberIds: eligibleMemberIds.length === allChildren.length ? [] : eligibleMemberIds,
           dueDate,
@@ -662,8 +706,9 @@ export function installRulesFeatures(AppClass) {
     /** Calcula el pago (recalculado desde la tarea vigente, nunca desde el claim) y el estado del tope mensual. */
     computeTaskPayment(task, member) {
       const band = this.getMemberBand(member);
-      const amount = task.kind === 'EXTRA' ? Number(task.rewardByBand?.[band] || 0) : 0;
-      const cap = Number(this.getRulesConfig().taskMonthlyCapByBand?.[band] || 0);
+      const amount = this.getTaskRewardCents(task);
+      const cfg = this.getRulesConfig();
+      const cap = Number(cfg.taskMonthlyCapCents ?? cfg.taskMonthlyCapByBand?.[band] ?? 50000);
       const today = getTodayLocalDate();
       const windowStart = addDaysLocalDate(today, -30);
       const reversed = new Set(this.auditResult.validEvents.filter((e) => e.type === 'REVERSAL').map((e) => e.targetEventId));
@@ -942,14 +987,14 @@ export function installRulesFeatures(AppClass) {
               `<optgroup label="${LEVEL_META[lvl].label}">` +
               presets
                 .filter((p) => p.level === lvl)
-                .map((p) => `<option value="${p.id}">${esc(p.title)}</option>`)
+                .map((p) => `<option value="${p.id}">${esc(p.title)} (${formatMoneyCents(this.getPresetAmountCents(p))})</option>`)
                 .join('') +
               `</optgroup>`
           )
           .join('');
         if (presetId) sel.value = presetId;
         document.getElementById('fineChildSelect').innerHTML = this.getChildren()
-          .map((c) => `<option value="${c.id}" ${c.id === this.selectedChildId ? 'selected' : ''}>${esc(c.name)} (${c.age || 10} años)</option>`)
+          .map((c) => `<option value="${c.id}" ${c.id === this.selectedChildId ? 'selected' : ''}>${esc(c.name)}</option>`)
           .join('');
         document.getElementById('fineReasonInput').value = '';
         document.getElementById('fineRepairCostInput').value = '';
@@ -966,14 +1011,14 @@ export function installRulesFeatures(AppClass) {
       const band = this.getMemberBand(member);
       const cfg = this.getRulesConfig();
       const confessed = document.getElementById('fineConfessedCheck').checked;
-      let nominal = Number(preset.amountByBand?.[band] || 0);
+      let nominal = this.getPresetAmountCents(preset);
       let repairCostCents = 0;
       if (preset.kind === 'REPAIR') {
         repairCostCents = toCents(document.getElementById('fineRepairCostInput').value || 0);
         nominal = Math.min(Math.floor(repairCostCents * 0.5), nominal);
       }
       if (confessed) nominal = Math.floor(nominal / 2);
-      const limits = FINE_LEVEL_LIMITS[preset.level]?.[band] || [0, 50000];
+      const limits = this.getFineLevelBounds(preset.level);
       nominal = Math.min(nominal, limits[1]);
       return {
         preset,
@@ -988,8 +1033,8 @@ export function installRulesFeatures(AppClass) {
           presetId: preset.id,
           iconKey: preset.iconKey || 'scale',
           ageBand: band,
-          monthlyCapCents: Number(cfg.fineMonthlyCapByBand?.[band] || 0),
-          minCapCents: Number(cfg.fineMinCapByBand?.[band] || 0),
+          monthlyCapCents: Number(cfg.fineMonthlyCapCents ?? cfg.fineMonthlyCapByBand?.[band] ?? 15000),
+          minCapCents: Number(cfg.fineMinCapCents ?? cfg.fineMinCapByBand?.[band] ?? 1000),
           incomePct: Number(cfg.fineIncomePct || 25),
           confessed,
           repairCostCents,
@@ -1174,8 +1219,13 @@ export function installRulesFeatures(AppClass) {
         document.getElementById('fpKindSelect').value = p?.kind || 'FIXED';
         document.getElementById('fpTitleInput').value = p?.title || '';
         document.getElementById('fpDescInput').value = p?.description || '';
-        document.getElementById('fpAmount912Input').value = ((p?.amountByBand?.['9_12'] || 500) / 100).toFixed(0);
-        document.getElementById('fpAmount1317Input').value = ((p?.amountByBand?.['13_17'] || 1000) / 100).toFixed(0);
+        const amountDollars = ((this.getPresetAmountCents(p) || 1000) / 100).toFixed(0);
+        const fpAmount = document.getElementById('fpAmountInput');
+        if (fpAmount) fpAmount.value = amountDollars;
+        const fp912 = document.getElementById('fpAmount912Input');
+        if (fp912) fp912.value = amountDollars;
+        const fp1317 = document.getElementById('fpAmount1317Input');
+        if (fp1317) fp1317.value = amountDollars;
         document.getElementById('fpIconSelect').value = FINE_ICON_KEYS.includes(p?.iconKey) ? p.iconKey : 'scale';
         this.syncFinePresetHint();
         document.getElementById('dialogFinePreset')?.showModal();
@@ -1185,11 +1235,11 @@ export function installRulesFeatures(AppClass) {
     syncFinePresetHint() {
       const level = document.getElementById('fpLevelSelect').value;
       const kind = document.getElementById('fpKindSelect').value;
-      const l = FINE_LEVEL_LIMITS[level];
+      const [minCents, maxCents] = this.getFineLevelBounds(level);
       document.getElementById('fpLimitsHint').textContent =
         kind === 'REPAIR'
-          ? `Reparación: se cobra el 50% del costo hasta el tope que pongas (máximo 9–12: ${formatMoneyCents(l['9_12'][1])}, 13–17: ${formatMoneyCents(l['13_17'][1])}).`
-          : `Rango permitido ${LEVEL_META[level].label}: 9–12 de ${formatMoneyCents(l['9_12'][0])} a ${formatMoneyCents(l['9_12'][1])} · 13–17 de ${formatMoneyCents(l['13_17'][0])} a ${formatMoneyCents(l['13_17'][1])}.`;
+          ? `Reparación: se cobra el 50% del costo hasta el tope que pongas (máximo ${formatMoneyCents(maxCents)}, igual para todos).`
+          : `Rango permitido ${LEVEL_META[level].label}: de ${formatMoneyCents(minCents)} a ${formatMoneyCents(maxCents)} (igual para todos).`;
     },
 
     async submitFinePresetForm() {
@@ -1198,18 +1248,16 @@ export function installRulesFeatures(AppClass) {
         const level = document.getElementById('fpLevelSelect').value;
         const kind = document.getElementById('fpKindSelect').value;
         const title = document.getElementById('fpTitleInput').value.trim();
-        const a912 = toCents(document.getElementById('fpAmount912Input').value || 0);
-        const a1317 = toCents(document.getElementById('fpAmount1317Input').value || 0);
-        const l = FINE_LEVEL_LIMITS[level];
-        const minA = kind === 'REPAIR' ? 100 : null;
-        const ok912 = a912 >= (minA ?? l['9_12'][0]) && a912 <= l['9_12'][1];
-        const ok1317 = a1317 >= (minA ?? l['13_17'][0]) && a1317 <= l['13_17'][1];
+        const rawAmount = document.getElementById('fpAmountInput')?.value ?? document.getElementById('fpAmount912Input')?.value ?? 0;
+        const amountCents = toCents(rawAmount);
+        const [minCents, maxCents] = this.getFineLevelBounds(level);
+        const minAllowed = kind === 'REPAIR' ? 100 : minCents;
         if (!title) {
           this.showToast('Escribe el nombre de la regla.', 'warn');
           return;
         }
-        if (!ok912 || !ok1317) {
-          this.showToast('Los montos están fuera del rango permitido para ese nivel.', 'warn');
+        if (amountCents < minAllowed || amountCents > maxCents) {
+          this.showToast(`El monto debe estar entre ${formatMoneyCents(minAllowed)} y ${formatMoneyCents(maxCents)}.`, 'warn');
           return;
         }
         const data = {
@@ -1218,7 +1266,9 @@ export function installRulesFeatures(AppClass) {
           title,
           description: document.getElementById('fpDescInput').value.trim(),
           iconKey: document.getElementById('fpIconSelect').value,
-          amountByBand: { '9_12': a912, '13_17': a1317 },
+          amountCents,
+          amountByBand: { '9_12': amountCents, '13_17': amountCents },
+          version: 2,
           active: true,
           updatedAt: new Date().toISOString()
         };
@@ -1247,62 +1297,79 @@ export function installRulesFeatures(AppClass) {
     },
 
     /* ----------------------------------------------------------------------
-       PLANES DE AHORRO Y LÍMITES (Ajustes de Papá/Mamá)
+       PLANES DE AHORRO Y LÍMITES (Ajustes de Papá/Mamá - Sin distinción por edad)
        ---------------------------------------------------------------------- */
     openPlansDialog() {
       this.runAsParent(() => {
         const plans = this.getInvestmentPlans();
         const cfg = this.getRulesConfig();
         document.getElementById('plansEditorBody').innerHTML = plans
-          .map(
-            (p) => `
+          .map((p) => {
+            const bps = this.getPlanYieldBps(p);
+            return `
             <tr>
               <td><strong>${esc(p.label)}</strong><br/><span style="font-size: 0.75rem; color: var(--text-muted);">${p.termDays} días</span></td>
-              <td><input type="number" class="form-input" id="planRate_${p.id}_9_12" min="0" max="25" step="0.05" value="${(Number(p.yieldBpsByBand?.['9_12'] || 0) / 100).toFixed(2)}" /></td>
-              <td><input type="number" class="form-input" id="planRate_${p.id}_13_17" min="0" max="25" step="0.05" value="${(Number(p.yieldBpsByBand?.['13_17'] || 0) / 100).toFixed(2)}" /></td>
+              <td><input type="number" class="form-input" id="planRate_${p.id}" min="0" max="50" step="0.05" value="${(bps / 100).toFixed(2)}" /></td>
               <td><input type="number" class="form-input" id="planMin_${p.id}" min="1" step="1" value="${(Number(p.minPrincipalCents || 0) / 100).toFixed(0)}" /></td>
-            </tr>`
-          )
+            </tr>`;
+          })
           .join('');
         const setVal = (id, cents) => {
           const el = document.getElementById(id);
           if (el) el.value = (Number(cents || 0) / 100).toFixed(0);
         };
-        setVal('cfgInvestCap912', cfg.investCapByBand['9_12']);
-        setVal('cfgInvestCap1317', cfg.investCapByBand['13_17']);
-        setVal('cfgTaskCap912', cfg.taskMonthlyCapByBand['9_12']);
-        setVal('cfgTaskCap1317', cfg.taskMonthlyCapByBand['13_17']);
-        setVal('cfgFineCap912', cfg.fineMonthlyCapByBand['9_12']);
-        setVal('cfgFineCap1317', cfg.fineMonthlyCapByBand['13_17']);
+        const invCap = cfg.investCapCents ?? cfg.investCapByBand?.['13_17'] ?? 250000;
+        const taskCap = cfg.taskMonthlyCapCents ?? cfg.taskMonthlyCapByBand?.['13_17'] ?? 50000;
+        const fineCap = cfg.fineMonthlyCapCents ?? cfg.fineMonthlyCapByBand?.['13_17'] ?? 15000;
+        setVal('cfgInvestCap', invCap);
+        setVal('cfgTaskCap', taskCap);
+        setVal('cfgFineCap', fineCap);
+        setVal('cfgInvestCap912', invCap);
+        setVal('cfgInvestCap1317', invCap);
+        setVal('cfgTaskCap912', taskCap);
+        setVal('cfgTaskCap1317', taskCap);
+        setVal('cfgFineCap912', fineCap);
+        setVal('cfgFineCap1317', fineCap);
         this.updatePlansCostPreview();
         document.getElementById('dialogPlans')?.showModal();
       });
     },
 
     readPlansForm() {
-      const plans = this.getInvestmentPlans().map((p) => ({
-        ...p,
-        yieldBpsByBand: {
-          '9_12': Math.round(Number(document.getElementById(`planRate_${p.id}_9_12`)?.value || 0) * 100),
-          '13_17': Math.round(Number(document.getElementById(`planRate_${p.id}_13_17`)?.value || 0) * 100)
-        },
-        minPrincipalCents: toCents(document.getElementById(`planMin_${p.id}`)?.value || 0)
-      }));
+      const plans = this.getInvestmentPlans().map((p) => {
+        const rawRate = document.getElementById(`planRate_${p.id}`)?.value ?? document.getElementById(`planRate_${p.id}_13_17`)?.value ?? 0;
+        const bps = Math.round(Number(rawRate) * 100);
+        return {
+          ...p,
+          yieldBps: bps,
+          yieldBpsByBand: { '9_12': bps, '13_17': bps },
+          minPrincipalCents: toCents(document.getElementById(`planMin_${p.id}`)?.value || 0)
+        };
+      });
+      const invCap = toCents(document.getElementById('cfgInvestCap')?.value ?? document.getElementById('cfgInvestCap1317')?.value ?? 2500);
+      const taskCap = toCents(document.getElementById('cfgTaskCap')?.value ?? document.getElementById('cfgTaskCap1317')?.value ?? 500);
+      const fineCap = toCents(document.getElementById('cfgFineCap')?.value ?? document.getElementById('cfgFineCap1317')?.value ?? 150);
       const caps = {
-        investCapByBand: { '9_12': toCents(document.getElementById('cfgInvestCap912').value || 0), '13_17': toCents(document.getElementById('cfgInvestCap1317').value || 0) },
-        taskMonthlyCapByBand: { '9_12': toCents(document.getElementById('cfgTaskCap912').value || 0), '13_17': toCents(document.getElementById('cfgTaskCap1317').value || 0) },
-        fineMonthlyCapByBand: { '9_12': toCents(document.getElementById('cfgFineCap912').value || 0), '13_17': toCents(document.getElementById('cfgFineCap1317').value || 0) }
+        investCapCents: invCap,
+        investCapByBand: { '9_12': invCap, '13_17': invCap },
+        taskMonthlyCapCents: taskCap,
+        taskMonthlyCapByBand: { '9_12': taskCap, '13_17': taskCap },
+        fineMonthlyCapCents: fineCap,
+        fineMonthlyCapByBand: { '9_12': fineCap, '13_17': fineCap },
+        version: 2
       };
       return { plans, caps };
     },
 
     validatePlans(plans, caps) {
-      for (const band of ['9_12', '13_17']) {
-        const ann = plans.map((p) => annualizedPct(p.yieldBpsByBand[band], p.termDays));
-        if (ann.some((a) => a < 0 || a > 25)) return 'Ninguna tasa puede equivaler a más de 25% al año.';
-        const [s, m, l] = ann;
-        if (!(l >= m && m >= s)) return `Para ${BAND_LABEL[band]}: el plazo LARGO debe pagar igual o más que el MEDIANO, y el MEDIANO igual o más que el CORTO (comparando al año).`;
-        if (plans.some((p) => p.minPrincipalCents > caps.investCapByBand[band])) return 'El mínimo de un plan no puede ser mayor que el tope total guardado.';
+      const ann = plans.map((p) => annualizedPct(p.yieldBps, p.termDays));
+      if (ann.some((a) => a < 0 || a > 60)) return 'Ninguna tasa puede equivaler a más de 60% al año.';
+      const [s, m, l] = ann;
+      if (!(l >= m && m >= s)) {
+        return 'El plazo LARGO debe pagar igual o más que el MEDIANO, y el MEDIANO igual o más que el CORTO (comparando al año).';
+      }
+      if (plans.some((p) => p.minPrincipalCents > caps.investCapCents)) {
+        return 'El mínimo de un plan no puede ser mayor que el tope total guardado.';
       }
       return null;
     },
@@ -1312,13 +1379,16 @@ export function installRulesFeatures(AppClass) {
       if (!box) return;
       const { plans, caps } = this.readPlansForm();
       const err = this.validatePlans(plans, caps);
-      const long = plans.find((p) => p.id === 'LONG');
-      const rows = ['9_12', '13_17'].map((band) => {
-        const ann = plans.map((p) => `${p.id === 'SHORT' ? 'Corto' : p.id === 'MEDIUM' ? 'Mediano' : 'Largo'} ≈ ${annualizedPct(p.yieldBpsByBand[band], p.termDays).toFixed(1)}%`).join(' · ');
-        const maxCost = Math.floor((caps.investCapByBand[band] * long.yieldBpsByBand[band]) / 10000);
-        return `<div><strong>${BAND_LABEL[band]}:</strong> equivalente al año: ${ann}. Costo máximo para ustedes: <strong>${formatMoneyCents(maxCost)}</strong> al año por hijo.</div>`;
-      });
-      box.innerHTML = `${rows.join('')}${err ? `<div style="color: var(--color-expense); margin-top: 0.35rem;"><strong>${esc(err)}</strong></div>` : ''}<div style="margin-top: 0.35rem; color: var(--text-muted);">Referencia: CETES a 28 días ≈ 6.5% anual. Los ahorros activos conservan su tasa original.</div>`;
+      const long = plans.find((p) => p.id === 'LONG') || { yieldBps: 2600 };
+      const ann = plans
+        .map((p) => `${p.id === 'SHORT' ? 'Corto (1 mes)' : p.id === 'MEDIUM' ? 'Mediano (6 meses)' : 'Largo (1 año)'}: +${(p.yieldBps / 100).toFixed(2)}% (≈ ${annualizedPct(p.yieldBps, p.termDays).toFixed(1)}% anual)`)
+        .join(' · ');
+      const maxCost = Math.floor((caps.investCapCents * long.yieldBps) / 10000);
+      box.innerHTML = `
+        <div><strong>Tasas parejas para todos:</strong> ${ann}.</div>
+        <div style="margin-top: 0.25rem;">Costo máximo para ustedes con el tope lleno: <strong>${formatMoneyCents(maxCost)}</strong> al año por hijo.</div>
+        ${err ? `<div style="color: var(--color-expense); margin-top: 0.35rem;"><strong>${esc(err)}</strong></div>` : ''}
+        <div style="margin-top: 0.35rem; color: var(--text-muted);">Los ahorros activos conservan la tasa del día en que fueron creados.</div>`;
     },
 
     async submitPlansForm() {
@@ -1333,18 +1403,19 @@ export function installRulesFeatures(AppClass) {
         const prev = this.getInvestmentPlans();
         this.state.family.investmentPlans = plans.map((p) => {
           const old = prev.find((x) => x.id === p.id) || {};
-          const changed =
-            old.minPrincipalCents !== p.minPrincipalCents ||
-            old.yieldBpsByBand?.['9_12'] !== p.yieldBpsByBand['9_12'] ||
-            old.yieldBpsByBand?.['13_17'] !== p.yieldBpsByBand['13_17'];
-          return { ...p, version: changed ? Number(old.version || 1) + 1 : Number(old.version || 1), updatedAt: changed ? nowIso : old.updatedAt || nowIso };
+          const changed = old.minPrincipalCents !== p.minPrincipalCents || this.getPlanYieldBps(old) !== p.yieldBps;
+          return {
+            ...p,
+            version: Math.max(2, changed ? Number(old.version || 2) + 1 : Number(old.version || 2)),
+            updatedAt: changed ? nowIso : old.updatedAt || nowIso
+          };
         });
         this.state.family.rulesConfig = { ...this.getRulesConfig(), ...caps, updatedAt: nowIso };
         this.state.family.updatedAt = nowIso;
         document.getElementById('dialogPlans')?.close();
         await this.cloudManager.pushState(this.state);
         this.renderAll();
-        this.showToast('Tasas y límites guardados. Los ahorros activos conservan su tasa original.', 'success');
+        this.showToast('Tasas y límites guardados (parejos para todos los hijos).', 'success');
       });
     },
 
@@ -1355,7 +1426,8 @@ export function installRulesFeatures(AppClass) {
       const plan = this.getPlan(planId);
       if (!plan) return { error: 'Elige un plan de ahorro.' };
       const band = this.getMemberBand(member);
-      const cap = Number(this.getRulesConfig().investCapByBand?.[band] || 0);
+      const cfg = this.getRulesConfig();
+      const cap = Number(cfg.investCapCents ?? cfg.investCapByBand?.[band] ?? 250000);
       if (principalCents < Number(plan.minPrincipalCents || 0)) {
         return { error: `El mínimo para ${plan.label} es ${formatMoneyCents(plan.minPrincipalCents)}.` };
       }
@@ -1364,7 +1436,7 @@ export function installRulesFeatures(AppClass) {
       if (investedOther + principalCents > cap) {
         return { error: `Con esto pasarías el tope de ahorro a plazo (${formatMoneyCents(cap)}). Ya tienes ${formatMoneyCents(investedOther)} guardado.` };
       }
-      const bps = Number(plan.yieldBpsByBand?.[band] || 0);
+      const bps = this.getPlanYieldBps(plan);
       return { plan, band, bps, expectedYieldCents: Math.floor((principalCents * bps) / 10000), fin };
     },
 

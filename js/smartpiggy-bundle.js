@@ -1,15 +1,16 @@
 /**
- * SmartPiggy Cloud - Bundle Unificado v6
+ * SmartPiggy Cloud - Bundle Completo v8 (Tareas, Reglas/Multas y Planes de Ahorro Parejos con Interés Doble)
  */
 (function () {
-  'use strict';
+'use strict';
 
-  /* === icons.js === */
+/* === MODULE: icons.js === */
 /**
  * SmartPiggy Cloud - Sistema Integral de Iconografía SVG Vectorial
  * Reemplaza todos los iconos por gráficos vectoriales SVG escalables (<svg viewBox="0 0 24 24">),
  * incluyendo mapeo automático de compatibilidad para datos existentes en almacenamiento local.
  */
+
 const SVG_ICON_PATHS = {
   // Tareas, Retos, Reglas de la Casa y Planes de Ahorro (set fijo SVG)
   broom: `<path d="m13 11 9-9"/><path d="M14.6 12.6c.8.8.9 2.1.2 3L10 21l-7-7 5.4-4.8c.9-.7 2.2-.6 3 .2Z"/><path d="m6.8 10.4 6.8 6.8"/><path d="m5 17 1.5 1.5"/>`,
@@ -160,6 +161,7 @@ const LEGACY_EMOJI_TO_SVG_MAP = {
   '▶️': 'play',
   '⏹️': 'stop'
 };
+
 function resolveIconKey(keyOrLegacy, fallback = 'piggy') {
   if (!keyOrLegacy) return fallback;
   const trimmed = String(keyOrLegacy).trim();
@@ -178,8 +180,7 @@ function renderSvgIcon(keyOrLegacy, size = 18, extraClass = '') {
   return `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${innerPaths}</svg>`;
 }
 
-
-  /* === crypto-ledger.js === */
+/* === MODULE: crypto-ledger.js === */
 /**
  * SmartPiggy Cloud - Motor Criptográfico y de Integridad del Libro Mayor (Ronda 2 Auditado)
  * Implementa:
@@ -229,6 +230,7 @@ function fallbackHashHex(inputStr) {
   const p2 = (h2 >>> 0).toString(16).padStart(8, '0');
   return (p1 + p2 + p1 + p2 + p2 + p1 + p2 + p1).slice(0, 64);
 }
+
 function generateSaltHex(byteLength = 16) {
   if (window.crypto && window.crypto.getRandomValues) {
     const arr = new Uint8Array(byteLength);
@@ -282,6 +284,7 @@ function canonicalEventPayload(event) {
   }
   return JSON.stringify(payload);
 }
+
 async function sha256Hex(message) {
   if (window.crypto && window.crypto.subtle) {
     const buf = await window.crypto.subtle.digest('SHA-256', encoder.encode(message));
@@ -356,6 +359,7 @@ async function deriveParentKeyBundle(pin, familySaltHex) {
 async function computePublicIntegritySeal(eventHash, familySaltHex) {
   return sha256Hex(`SEAL_V2:${familySaltHex}:${eventHash}:${eventHash.slice(0, 16)}`);
 }
+
 async function signEventHash(eventHash, signingKey) {
   if (!signingKey) {
     throw new Error('OPERACIÓN RECHAZADA: Se requiere sesión activa de Papá/Mamá con llave criptográfica en memoria.');
@@ -370,6 +374,7 @@ async function signEventHash(eventHash, signingKey) {
   }
   return fallbackHashHex(`HMAC:${signingKey.__fallbackSecret}:${eventHash}`);
 }
+
 async function verifyEventSignature(eventHash, signatureHex, signingKey) {
   if (!signingKey || !signatureHex) return false;
   if (window.crypto && window.crypto.subtle && !(signingKey.__fallbackSecret)) {
@@ -482,8 +487,1073 @@ async function auditLedgerEvents(events, familySaltHex, parentSigningKey = null)
   };
 }
 
+/* === MODULE: seed-data.js === */
+/**
+ * SmartPiggy Cloud - Estado Inicial Limpio (Sin datos de prueba)
+ * Crea la estructura base de la familia con saldo $0.00, sin movimientos ni préstamos de prueba,
+ * lista para registrar integrantes y movimientos reales con iconografía 100% SVG.
+ */
+const DEFAULT_DEMO_PIN = '1234';
 
-  /* === financial-engine.js === */
+async function buildInitialSignedFamilyState(customFamilyCode = 'FAM-2026-KIDS', initialPin = DEFAULT_DEMO_PIN) {
+  const nowIso = new Date().toISOString();
+  const saltHex = generateSaltHex(16);
+  const { authVerifier } = await deriveParentKeyBundle(initialPin, saltHex);
+
+  const family = {
+    id: 'fam_smartpiggy_01',
+    familyCode: customFamilyCode,
+    name: 'Mi Familia',
+    currency: 'MXN',
+    saltHex,
+    authVerifier,
+    resetEpoch: Date.now(),
+    deletedIds: {},
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+
+  const members = [
+    {
+      id: 'parent_admin',
+      familyId: family.id,
+      role: 'PARENT',
+      name: 'Papá / Mamá',
+      title: 'Administrador Familiar',
+      avatar: 'parent-male',
+      themeColor: '#6366f1',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    },
+    {
+      id: 'child_principal',
+      familyId: family.id,
+      role: 'CHILD',
+      name: 'Mi Alcancía',
+      age: 10,
+      avatar: 'piggy',
+      themeColor: '#10b981',
+      goalTitle: 'Mi Meta de Ahorro',
+      goalTargetCents: 100000, // $1,000.00
+      goalIcon: 'target',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    }
+  ];
+
+  const catalogs = [
+    // Fuentes de Ingresos (Iconos SVG)
+    {
+      id: 'cat_inc_allowance',
+      familyId: family.id,
+      type: 'INCOME_SOURCE',
+      name: 'Mesada / Domingo',
+      icon: 'calendar',
+      color: '#10b981',
+      description: 'Mesada periódica entregada por Papá o Mamá',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_inc_chores',
+      familyId: family.id,
+      type: 'INCOME_SOURCE',
+      name: 'Tareas Extra en Casa',
+      icon: 'sparkles',
+      color: '#06b6d4',
+      description: 'Ayudar en casa, jardín o lavar el auto',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_inc_grades',
+      familyId: family.id,
+      type: 'INCOME_SOURCE',
+      name: 'Buenas Calificaciones',
+      icon: 'trophy',
+      color: '#f59e0b',
+      description: 'Premio por esfuerzo escolar y lectura',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_inc_gift',
+      familyId: family.id,
+      type: 'INCOME_SOURCE',
+      name: 'Regalo / Cumpleaños',
+      icon: 'gift',
+      color: '#8b5cf6',
+      description: 'Regalos de familiares o fechas especiales',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_inc_yield',
+      familyId: family.id,
+      type: 'INCOME_SOURCE',
+      name: 'Ganancia por Guardar a Plazo',
+      icon: 'trending-up',
+      color: '#14b8a6',
+      description: 'Premio ganado por ahorrar a plazo fijo',
+      isActive: true,
+      updatedAt: nowIso
+    },
+
+    // Categorías de Gastos (Iconos SVG)
+    {
+      id: 'cat_exp_snacks',
+      familyId: family.id,
+      type: 'EXPENSE_CATEGORY',
+      name: 'Dulces, Helados y Snacks',
+      icon: 'icecream',
+      color: '#ec4899',
+      description: 'Antojos, postres y salidas',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_exp_toys',
+      familyId: family.id,
+      type: 'EXPENSE_CATEGORY',
+      name: 'Juguetes y Juegos',
+      icon: 'puzzle',
+      color: '#f43f5e',
+      description: 'Juegos de mesa, figuras o pasatiempos',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_exp_games',
+      familyId: family.id,
+      type: 'EXPENSE_CATEGORY',
+      name: 'Videojuegos y Apps',
+      icon: 'gamepad',
+      color: '#6366f1',
+      description: 'Juegos digitales y accesorios',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_exp_books',
+      familyId: family.id,
+      type: 'EXPENSE_CATEGORY',
+      name: 'Libros, Arte y Deporte',
+      icon: 'palette',
+      color: '#0ea5e9',
+      description: 'Libros, dibujo y equipo deportivo',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_exp_outings',
+      familyId: family.id,
+      type: 'EXPENSE_CATEGORY',
+      name: 'Salidas con Amigos',
+      icon: 'popcorn',
+      color: '#f97316',
+      description: 'Cine, paseos y convivios',
+      isActive: true,
+      updatedAt: nowIso
+    },
+    {
+      id: 'cat_exp_loan',
+      familyId: family.id,
+      type: 'EXPENSE_CATEGORY',
+      name: 'Pago de Préstamo',
+      icon: 'credit-card',
+      color: '#a855f7',
+      description: 'Pagos a préstamos de Papá o Mamá',
+      isActive: true,
+      updatedAt: nowIso
+    }
+  ];
+
+  return {
+    family: {
+      ...family,
+      investmentPlans: buildDefaultInvestmentPlans(nowIso),
+      rulesConfig: buildDefaultRulesConfig(nowIso)
+    },
+    members,
+    catalogs,
+    recurringRules: [],
+    loans: [],
+    investments: [],
+    childRequests: [],
+    tasks: buildDefaultTasks(family.id, nowIso),
+    taskClaims: [],
+    taskReviews: [],
+    finePresets: buildDefaultFinePresets(family.id, nowIso),
+    ledgerEvents: [],
+    lastSyncedAt: nowIso
+  };
+}
+
+/* ==========================================================================
+   TAREAS, MULTAS Y PLANES DE AHORRO (Montos parejos sin distinción por edad)
+   Montos en centavos MXN. A igual tarea, misma recompensa; a misma regla,
+   misma consecuencia; a mismo plazo de ahorro, misma tasa de interés.
+   ========================================================================== */
+
+const AGE_BANDS = ['9_12', '13_17'];
+
+/** Plantillas de tareas (EXTRA = con pago parejo; RESPONSIBILITY = responsabilidad sin pago). */
+const TASK_TEMPLATES = [
+  { id: 'tpl_car', kind: 'EXTRA', title: 'Lavar el coche', description: 'Por dentro y por fuera, sin dejar manchas.', iconKey: 'car', unit: 'ONCE', rewardCents: 5000, rewardByBand: { '9_12': 5000, '13_17': 5000 } },
+  { id: 'tpl_laundry', kind: 'EXTRA', title: 'Lavar y doblar la ropa de la familia', description: 'Separar colores, lavar, doblar y guardar.', iconKey: 'shirt', unit: 'ONCE', rewardCents: 3000, rewardByBand: { '9_12': 3000, '13_17': 3000 } },
+  { id: 'tpl_cook', kind: 'EXTRA', title: 'Ayudar a cocinar la comida del domingo', description: 'Ayudar a preparar y a dejar la cocina limpia.', iconKey: 'food', unit: 'ONCE', rewardCents: 3500, rewardByBand: { '9_12': 3500, '13_17': 3500 } },
+  { id: 'tpl_closet', kind: 'EXTRA', title: 'Organizar clóset o bodega', description: 'Ordenar, separar lo que ya no se usa y limpiar.', iconKey: 'broom', unit: 'ONCE', rewardCents: 4000, rewardByBand: { '9_12': 4000, '13_17': 4000 } },
+  { id: 'tpl_yard', kind: 'EXTRA', title: 'Limpiar patio o ventanas', description: 'Barrer, regar plantas o limpiar vidrios.', iconKey: 'plant', unit: 'ONCE', rewardCents: 4500, rewardByBand: { '9_12': 4500, '13_17': 4500 } },
+  { id: 'tpl_grocery', kind: 'EXTRA', title: 'Reto: lista del súper con presupuesto', description: 'Arma la lista de la semana sin pasarte del presupuesto que te demos.', iconKey: 'cart', unit: 'ONCE', rewardCents: 3500, rewardByBand: { '9_12': 3500, '13_17': 3500 } },
+  { id: 'tpl_book', kind: 'EXTRA', title: 'Reto: leer un libro y contarlo', description: 'Lee un libro completo y cuéntanos de qué trató.', iconKey: 'book', unit: 'ONCE', rewardCents: 5000, rewardByBand: { '9_12': 5000, '13_17': 5000 } },
+  { id: 'tpl_noscreens', kind: 'EXTRA', title: 'Reto: fin de semana sin pantallas', description: 'Sábado y domingo sin videojuegos ni redes sociales.', iconKey: 'phone', unit: 'WEEK', rewardCents: 4000, rewardByBand: { '9_12': 4000, '13_17': 4000 } },
+  { id: 'tpl_babysit', kind: 'EXTRA', title: 'Cuidar a un hermano menor 2 horas', description: 'Cuidarlo con atención, jugando y sin pantallas.', iconKey: 'users', unit: 'ONCE', rewardCents: 5000, rewardByBand: { '9_12': 5000, '13_17': 5000 } },
+  { id: 'tpl_bed', kind: 'RESPONSIBILITY', title: 'Tender tu cama', description: 'Responsabilidad diaria. No se paga: es parte de vivir en familia.', iconKey: 'bed', unit: 'WEEK', rewardCents: 0, rewardByBand: { '9_12': 0, '13_17': 0 } },
+  { id: 'tpl_room', kind: 'RESPONSIBILITY', title: 'Recoger tu cuarto', description: 'Responsabilidad. No se paga.', iconKey: 'broom', unit: 'WEEK', rewardCents: 0, rewardByBand: { '9_12': 0, '13_17': 0 } },
+  { id: 'tpl_dishes', kind: 'RESPONSIBILITY', title: 'Lavar tus trastes', description: 'Responsabilidad. No se paga.', iconKey: 'dish', unit: 'WEEK', rewardCents: 0, rewardByBand: { '9_12': 0, '13_17': 0 } },
+  { id: 'tpl_trash', kind: 'RESPONSIBILITY', title: 'Tu turno de sacar la basura', description: 'Responsabilidad. No se paga.', iconKey: 'trash', unit: 'WEEK', rewardCents: 0, rewardByBand: { '9_12': 0, '13_17': 0 } },
+  { id: 'tpl_homework', kind: 'RESPONSIBILITY', title: 'Hacer la tarea de la escuela', description: 'Responsabilidad. No se paga.', iconKey: 'book', unit: 'WEEK', rewardCents: 0, rewardByBand: { '9_12': 0, '13_17': 0 } }
+];
+
+function buildDefaultTasks(familyId = 'fam_smartpiggy_01', nowIso = new Date().toISOString()) {
+  return TASK_TEMPLATES.map((tpl) => ({
+    id: `task_default_${tpl.id}`,
+    familyId,
+    kind: tpl.kind,
+    title: tpl.title,
+    description: tpl.description,
+    iconKey: tpl.iconKey,
+    maxAssignees: tpl.kind === 'RESPONSIBILITY' ? null : 1,
+    eligibleMemberIds: [],
+    unit: tpl.unit || 'ONCE',
+    rewardCents: tpl.rewardCents,
+    rewardByBand: { '9_12': tpl.rewardCents, '13_17': tpl.rewardCents },
+    dueDate: null,
+    status: 'OPEN',
+    createdBy: 'parent_admin',
+    createdAt: nowIso,
+    updatedAt: nowIso
+  }));
+}
+
+/** Límites de validación de multas por nivel (centavos, parejos para todos). */
+const FINE_LEVEL_LIMITS = {
+  LEVE: [500, 2000],
+  MEDIA: [1500, 6000],
+  GRAVE: [100, 20000]
+};
+
+function buildDefaultFinePresets(familyId = 'fam_smartpiggy_01', nowIso = new Date().toISOString()) {
+  const base = { familyId, active: true, version: 2, updatedAt: nowIso };
+  return [
+    { ...base, id: 'fine_lights', kind: 'FIXED', level: 'LEVE', title: 'Dejar luces o TV prendidas sin nadie', description: 'Cuidamos la energía y el dinero de la luz.', iconKey: 'bulb', amountCents: 1000, amountByBand: { '9_12': 1000, '13_17': 1000 } },
+    { ...base, id: 'fine_mess', kind: 'FIXED', level: 'LEVE', title: 'No recoger tus cosas después de 2 avisos', description: 'Se avisa dos veces antes de aplicar la multa.', iconKey: 'broom', amountCents: 1500, amountByBand: { '9_12': 1500, '13_17': 1500 } },
+    { ...base, id: 'fine_food', kind: 'FIXED', level: 'LEVE', title: 'Desperdiciar comida a propósito', description: 'Servirte solo lo que te vas a comer.', iconKey: 'food', amountCents: 1000, amountByBand: { '9_12': 1000, '13_17': 1000 } },
+    { ...base, id: 'fine_phone', kind: 'FIXED', level: 'MEDIA', title: 'Usar el celular en horario no permitido', description: 'Durante la comida, en la noche o en horas de escuela.', iconKey: 'phone', amountCents: 3000, amountByBand: { '9_12': 3000, '13_17': 3000 } },
+    { ...base, id: 'fine_respect', kind: 'FIXED', level: 'MEDIA', title: 'Groserías o faltas de respeto', description: 'Hablar con respeto a todos en casa.', iconKey: 'alert-triangle', amountCents: 4000, amountByBand: { '9_12': 4000, '13_17': 4000 } },
+    { ...base, id: 'fine_screentime', kind: 'FIXED', level: 'MEDIA', title: 'Pasarte del tiempo de pantallas acordado', description: 'Respetar el tiempo de videojuegos y redes que acordamos.', iconKey: 'clock', amountCents: 2000, amountByBand: { '9_12': 2000, '13_17': 2000 } },
+    { ...base, id: 'fine_broken', kind: 'REPAIR', level: 'GRAVE', title: 'Romper algo por descuido (reparación)', description: 'Pagas el 50% del costo hasta un tope. Si lo confiesas tú solo, pagas la mitad.', iconKey: 'broken', amountCents: 12000, amountByBand: { '9_12': 12000, '13_17': 12000 } },
+    { ...base, id: 'fine_damage', kind: 'REPAIR', level: 'GRAVE', title: 'Dañar algo ajeno (escuela, vecino)', description: 'Ayudas a reparar con el 50% del costo hasta un tope. Si lo confiesas, pagas la mitad.', iconKey: 'broken', amountCents: 12000, amountByBand: { '9_12': 12000, '13_17': 12000 } }
+  ];
+}
+
+function buildDefaultInvestmentPlans(nowIso = new Date().toISOString()) {
+  return [
+    { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBps: 200, yieldBpsByBand: { '9_12': 200, '13_17': 200 }, minPrincipalCents: 5000, earlyExit: 'PRINCIPAL_ONLY', version: 2, updatedAt: nowIso },
+    { id: 'MEDIUM', label: 'Mediano plazo (6 meses)', termDays: 182, yieldBps: 1250, yieldBpsByBand: { '9_12': 1250, '13_17': 1250 }, minPrincipalCents: 10000, earlyExit: 'HALF_ACCRUED', version: 2, updatedAt: nowIso },
+    { id: 'LONG', label: 'Largo plazo (1 año)', termDays: 365, yieldBps: 2600, yieldBpsByBand: { '9_12': 2600, '13_17': 2600 }, minPrincipalCents: 20000, earlyExit: 'HALF_ACCRUED', version: 2, updatedAt: nowIso }
+  ];
+}
+
+function buildDefaultRulesConfig(nowIso = new Date().toISOString()) {
+  return {
+    taskMonthlyCapCents: 50000,
+    taskMonthlyCapByBand: { '9_12': 50000, '13_17': 50000 },
+    fineMonthlyCapCents: 15000,
+    fineMonthlyCapByBand: { '9_12': 15000, '13_17': 15000 },
+    fineMinCapCents: 1000,
+    fineMinCapByBand: { '9_12': 1000, '13_17': 1000 },
+    fineIncomePct: 25,
+    investCapCents: 250000,
+    investCapByBand: { '9_12': 250000, '13_17': 250000 },
+    version: 2,
+    updatedAt: nowIso
+  };
+}
+
+/**
+ * Agrega a un estado existente las colecciones y configuraciones nuevas,
+ * unificando montos sin distinción de edad y actualizando los planes de ahorro al doble de interés.
+ */
+function ensureFeatureDefaults(state) {
+  if (!state || !state.family) return state;
+  const deleted = state.family.deletedIds || {};
+  const fallbackIso = '2026-01-01T00:00:00.000Z';
+
+  state.tasks = Array.isArray(state.tasks) ? state.tasks : [];
+  if (state.tasks.length === 0) {
+    state.tasks = buildDefaultTasks(state.family.id, fallbackIso).filter((t) => !deleted[t.id]);
+  } else {
+    state.tasks.forEach((t) => {
+      const b = t.rewardByBand || {};
+      const unified = Number.isFinite(Number(t.rewardCents))
+        ? Math.round(Number(t.rewardCents))
+        : Math.max(Number(b['9_12'] || 0), Number(b['13_17'] || 0));
+      t.rewardCents = unified;
+      t.rewardByBand = { '9_12': unified, '13_17': unified };
+    });
+  }
+
+  state.taskClaims = Array.isArray(state.taskClaims) ? state.taskClaims : [];
+  state.taskReviews = Array.isArray(state.taskReviews) ? state.taskReviews : [];
+
+  if (!Array.isArray(state.finePresets) || state.finePresets.length === 0) {
+    state.finePresets = buildDefaultFinePresets(state.family.id, fallbackIso).filter((p) => !deleted[p.id]);
+  } else {
+    const defaultsById = new Map(buildDefaultFinePresets(state.family.id, fallbackIso).map((p) => [p.id, p]));
+    state.finePresets.forEach((p) => {
+      const def = defaultsById.get(p.id);
+      const b = p.amountByBand || {};
+      if (def && (!p.version || p.version < 2) && b['9_12'] !== b['13_17']) {
+        p.amountCents = def.amountCents;
+        p.amountByBand = { '9_12': def.amountCents, '13_17': def.amountCents };
+        p.version = 2;
+      } else {
+        const unified = Number.isFinite(Number(p.amountCents))
+          ? Math.round(Number(p.amountCents))
+          : Math.max(Number(b['9_12'] || 0), Number(b['13_17'] || 0));
+        p.amountCents = unified;
+        p.amountByBand = { '9_12': unified, '13_17': unified };
+      }
+    });
+  }
+
+  if (!Array.isArray(state.family.investmentPlans) || state.family.investmentPlans.length !== 3) {
+    state.family.investmentPlans = buildDefaultInvestmentPlans(fallbackIso);
+  } else {
+    const defPlans = new Map(buildDefaultInvestmentPlans(fallbackIso).map((p) => [p.id, p]));
+    state.family.investmentPlans.forEach((p) => {
+      const def = defPlans.get(p.id);
+      if (def && (!p.version || p.version < 2)) {
+        p.yieldBps = def.yieldBps;
+        p.yieldBpsByBand = { '9_12': def.yieldBps, '13_17': def.yieldBps };
+        p.version = 2;
+      } else {
+        const b = p.yieldBpsByBand || {};
+        const unified = Number.isFinite(Number(p.yieldBps))
+          ? Math.round(Number(p.yieldBps))
+          : Math.max(Number(b['9_12'] || 0), Number(b['13_17'] || 0));
+        p.yieldBps = unified;
+        p.yieldBpsByBand = { '9_12': unified, '13_17': unified };
+      }
+    });
+  }
+
+  if (!state.family.rulesConfig || typeof state.family.rulesConfig !== 'object' || !state.family.rulesConfig.version || state.family.rulesConfig.version < 2) {
+    state.family.rulesConfig = buildDefaultRulesConfig(fallbackIso);
+  } else {
+    const rc = state.family.rulesConfig;
+    const taskCap = Number(rc.taskMonthlyCapCents ?? rc.taskMonthlyCapByBand?.['13_17'] ?? 50000);
+    const fineCap = Number(rc.fineMonthlyCapCents ?? rc.fineMonthlyCapByBand?.['13_17'] ?? 15000);
+    const fineMin = Number(rc.fineMinCapCents ?? rc.fineMinCapByBand?.['13_17'] ?? 1000);
+    const invCap = Number(rc.investCapCents ?? rc.investCapByBand?.['13_17'] ?? 250000);
+    rc.taskMonthlyCapCents = taskCap;
+    rc.taskMonthlyCapByBand = { '9_12': taskCap, '13_17': taskCap };
+    rc.fineMonthlyCapCents = fineCap;
+    rc.fineMonthlyCapByBand = { '9_12': fineCap, '13_17': fineCap };
+    rc.fineMinCapCents = fineMin;
+    rc.fineMinCapByBand = { '9_12': fineMin, '13_17': fineMin };
+    rc.investCapCents = invCap;
+    rc.investCapByBand = { '9_12': invCap, '13_17': invCap };
+  }
+
+  if (!state.catalogs?.some((c) => c.id === 'cat_exp_fines')) {
+    state.catalogs = state.catalogs || [];
+    state.catalogs.push({
+      id: 'cat_exp_fines',
+      familyId: state.family.id,
+      type: 'EXPENSE_CATEGORY',
+      name: 'Multas y Reparaciones',
+      icon: 'scale',
+      color: '#ef4444',
+      description: 'Multas de las reglas de la casa',
+      isActive: true,
+      updatedAt: fallbackIso
+    });
+  }
+  return state;
+}
+
+/* === MODULE: cloud-sync.js === */
+/**
+ * SmartPiggy Cloud - Motor de Sincronización en Tiempo Real con Supabase (Proyecto Existente) + CRDT G-Set
+ * Características clave:
+ * 1. Reutiliza cualquier proyecto existente de Supabase mediante una única tabla aislada (`public.smartpiggy_families`)
+ *    sin interferir con otras tablas ni requerir crear un proyecto nuevo.
+ * 2. Sincronización 100% Automática en Tiempo Real (Cero botones manuales):
+ *    - Canal WebSocket Phoenix de Supabase Realtime (`wss://<project>.supabase.co/realtime/v1/websocket`)
+ *      escuchando tanto `broadcast` instantáneo (`crdt_state`) como `postgres_changes` en `public.smartpiggy_families`.
+ *    - Persistencia REST JSONB automática (`POST /rest/v1/smartpiggy_families?on_conflict=family_code`).
+ *    - Respaldo simultáneo en `BroadcastChannel` multi-ventana y servidor local `/api/cloud/:familyCode`.
+ */
+
+const STORAGE_KEY_PREFIX = 'smartpiggy_cloud_state_v3_';
+const CLOUD_CONFIG_KEY = 'smartpiggy_cloud_provider_config_v2';
+
+const LEGACY_DEMO_IDS = new Set([
+  'child_sofia',
+  'child_mateo',
+  'parent_carlos',
+  'parent_elena',
+  'loan_sofia_artset',
+  'loan_mateo_headphones',
+  'inv_sofia_30d',
+  'inv_mateo_60d',
+  'rec_sofia_weekly',
+  'rec_mateo_biweekly',
+  'req_sofia_inv_01'
+]);
+
+function isLegacyDemoId(id = '') {
+  const s = String(id || '');
+  return (
+    LEGACY_DEMO_IDS.has(s) ||
+    s.startsWith('tx_seed_') ||
+    s.startsWith('det_rec_rec_sofia_') ||
+    s.startsWith('det_rec_rec_mateo_')
+  );
+}
+
+/**
+ * Elimina cualquier registro demostrativo antiguo que haya quedado en localStorage o en Supabase
+ * y garantiza que exista al menos un perfil Padre y un perfil Hijo limpio ($0.00).
+ */
+function stripLegacyDemoData(state) {
+  if (!state || !state.family) return state;
+
+  const nowIso = new Date().toISOString();
+  state.family.deletedIds = state.family.deletedIds || {};
+  if (state.family.name === 'Familia García-Mendoza') {
+    state.family.name = 'Mi Familia';
+  }
+
+  const filterDemo = (arr = []) =>
+    (arr || []).filter(
+      (item) =>
+        item &&
+        item.id &&
+        !isLegacyDemoId(item.id) &&
+        !isLegacyDemoId(item.memberId) &&
+        !state.family.deletedIds[item.id]
+    );
+
+  state.members = filterDemo(state.members);
+  state.catalogs = (state.catalogs || []).filter((c) => c && c.id && !state.family.deletedIds[c.id]);
+  state.recurringRules = filterDemo(state.recurringRules);
+  state.loans = filterDemo(state.loans);
+  state.investments = filterDemo(state.investments);
+  state.childRequests = filterDemo(state.childRequests);
+  state.ledgerEvents = filterDemo(state.ledgerEvents);
+  state.tasks = (state.tasks || []).filter((t) => t && t.id && !state.family.deletedIds[t.id]);
+  state.taskClaims = filterDemo(state.taskClaims);
+  state.taskReviews = filterDemo(state.taskReviews);
+  if (Array.isArray(state.finePresets)) {
+    state.finePresets = state.finePresets.filter((p) => p && p.id && !state.family.deletedIds[p.id]);
+  }
+
+  if (!state.members.some((m) => m.role === 'PARENT')) {
+    state.members.unshift({
+      id: 'parent_admin',
+      familyId: state.family.id,
+      role: 'PARENT',
+      name: 'Papá / Mamá',
+      title: 'Administrador Familiar',
+      avatar: 'parent-male',
+      themeColor: '#6366f1',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    });
+  }
+
+  if (!state.members.some((m) => m.role === 'CHILD')) {
+    state.members.push({
+      id: 'child_principal',
+      familyId: state.family.id,
+      role: 'CHILD',
+      name: 'Mi Alcancía',
+      age: 10,
+      avatar: 'piggy',
+      themeColor: '#10b981',
+      goalTitle: 'Mi Meta de Ahorro',
+      goalTargetCents: 100000,
+      goalIcon: 'target',
+      createdAt: nowIso,
+      updatedAt: nowIso
+    });
+  }
+
+  return state;
+}
+
+function mergeEntityCollection(localArr = [], remoteArr = [], deletedIdsMap = {}) {
+  const map = new Map();
+
+  for (const item of localArr) {
+    if (item && item.id && !deletedIdsMap[item.id] && !isLegacyDemoId(item.id) && !isLegacyDemoId(item.memberId)) {
+      map.set(item.id, item);
+    }
+  }
+
+  for (const rItem of remoteArr) {
+    if (!rItem || !rItem.id || deletedIdsMap[rItem.id] || isLegacyDemoId(rItem.id) || isLegacyDemoId(rItem.memberId)) {
+      continue;
+    }
+    const existing = map.get(rItem.id);
+    if (!existing) {
+      map.set(rItem.id, rItem);
+    } else {
+      const localTime = String(existing.updatedAt || existing.createdAt || '');
+      const remoteTime = String(rItem.updatedAt || rItem.createdAt || '');
+      if (remoteTime > localTime) {
+        map.set(rItem.id, rItem);
+      } else if (remoteTime === localTime) {
+        // Desempate determinista (p.ej. dos papás firmando el mismo evento con ID determinista al mismo tiempo):
+        // gana el hash/huella menor para que todos los dispositivos converjan al mismo registro.
+        const lKey = String(existing.eventHash || JSON.stringify(existing));
+        const rKey = String(rItem.eventHash || JSON.stringify(rItem));
+        if (rKey < lKey) map.set(rItem.id, rItem);
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+/**
+ * Fusión CRDT determinista con soporte para Tombstones (`deletedIds`), `resetEpoch` y limpieza de datos de prueba.
+ */
+function mergeFamilyCRDT(localState, remoteState) {
+  if (!remoteState || !remoteState.family) return stripLegacyDemoData(localState);
+  if (!localState || !localState.family) return stripLegacyDemoData(remoteState);
+
+  const cleanLocal = stripLegacyDemoData(localState);
+  const cleanRemote = stripLegacyDemoData(remoteState);
+
+  const localEpoch = Number(cleanLocal.family.resetEpoch || 0);
+  const remoteEpoch = Number(cleanRemote.family.resetEpoch || 0);
+  if (localEpoch > remoteEpoch && remoteEpoch > 0) {
+    return cleanLocal;
+  }
+  if (remoteEpoch > localEpoch && localEpoch > 0) {
+    return cleanRemote;
+  }
+
+  const mergedDeletedIds = {
+    ...(cleanLocal.family.deletedIds || {}),
+    ...(cleanRemote.family.deletedIds || {})
+  };
+
+  const localFamUpdated = String(cleanLocal.family.updatedAt || '');
+  const remoteFamUpdated = String(cleanRemote.family.updatedAt || '');
+  const mergedFamily =
+    remoteFamUpdated >= localFamUpdated
+      ? { ...cleanLocal.family, ...cleanRemote.family, deletedIds: mergedDeletedIds, resetEpoch: Math.max(localEpoch, remoteEpoch) }
+      : { ...cleanRemote.family, ...cleanLocal.family, deletedIds: mergedDeletedIds, resetEpoch: Math.max(localEpoch, remoteEpoch) };
+
+  return stripLegacyDemoData({
+    family: mergedFamily,
+    members: mergeEntityCollection(cleanLocal.members, cleanRemote.members, mergedDeletedIds),
+    catalogs: mergeEntityCollection(cleanLocal.catalogs, cleanRemote.catalogs, mergedDeletedIds),
+    recurringRules: mergeEntityCollection(cleanLocal.recurringRules, cleanRemote.recurringRules, mergedDeletedIds),
+    loans: mergeEntityCollection(cleanLocal.loans, cleanRemote.loans, mergedDeletedIds),
+    investments: mergeEntityCollection(cleanLocal.investments, cleanRemote.investments, mergedDeletedIds),
+    childRequests: mergeEntityCollection(cleanLocal.childRequests, cleanRemote.childRequests, mergedDeletedIds),
+    ledgerEvents: mergeEntityCollection(cleanLocal.ledgerEvents, cleanRemote.ledgerEvents, mergedDeletedIds),
+    tasks: mergeEntityCollection(cleanLocal.tasks, cleanRemote.tasks, mergedDeletedIds),
+    taskClaims: mergeEntityCollection(cleanLocal.taskClaims, cleanRemote.taskClaims, mergedDeletedIds),
+    taskReviews: mergeEntityCollection(cleanLocal.taskReviews, cleanRemote.taskReviews, mergedDeletedIds),
+    finePresets: mergeEntityCollection(cleanLocal.finePresets, cleanRemote.finePresets, mergedDeletedIds),
+    lastSyncedAt: new Date().toISOString()
+  });
+}
+
+class CloudSyncManager {
+  constructor({ onRemoteStateMerged, onSyncStatusChange }) {
+    this.onRemoteStateMerged = onRemoteStateMerged;
+    this.onSyncStatusChange = onSyncStatusChange;
+    this.channel = null;
+    this.pollTimer = null;
+    this.ws = null;
+    this.wsHeartbeatTimer = null;
+    this.wsReconnectTimer = null;
+    this.wsConnected = false;
+    this.wsRefCounter = 1;
+    this.familyCode = 'FAM-2026-KIDS';
+    this.tableName = 'smartpiggy_families';
+    this.cloudConfig = this.loadCloudConfig();
+    this.isSyncing = false;
+    this.serverAvailable = false;
+    this.getCurrentStateFn = null;
+
+    this.initRealtimeListeners();
+  }
+
+  loadCloudConfig() {
+    try {
+      const raw = localStorage.getItem(CLOUD_CONFIG_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          provider: parsed.provider || 'SUPABASE_REST',
+          endpointUrl: parsed.endpointUrl || '',
+          apiKey: parsed.apiKey || '',
+          tableName: parsed.tableName || 'smartpiggy_families',
+          autoSyncSeconds: 4
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      provider: 'SUPABASE_REST',
+      endpointUrl: '',
+      apiKey: '',
+      tableName: 'smartpiggy_families',
+      autoSyncSeconds: 4
+    };
+  }
+
+  saveCloudConfig(newConfig) {
+    this.cloudConfig = { ...this.cloudConfig, ...newConfig };
+    this.tableName = (this.cloudConfig.tableName || 'smartpiggy_families').trim();
+    try {
+      localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(this.cloudConfig));
+    } catch {
+      // ignore
+    }
+    this.connectRealtimeStream();
+  }
+
+  getStorageKey(familyCode = this.familyCode) {
+    const clean = String(familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
+    return `${STORAGE_KEY_PREFIX}${clean}`;
+  }
+
+  loadLocalState(familyCode = this.familyCode) {
+    this.familyCode = String(familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
+    try {
+      // Limpiar versiones previas que contenían datos de prueba
+      localStorage.removeItem(`smartpiggy_cloud_state_v2_${this.familyCode}`);
+      const raw = localStorage.getItem(this.getStorageKey(this.familyCode));
+      if (raw) {
+        return stripLegacyDemoData(JSON.parse(raw));
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  saveLocalState(state) {
+    if (!state || !state.family) return;
+    this.familyCode = String(state.family.familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
+    try {
+      localStorage.setItem(this.getStorageKey(this.familyCode), JSON.stringify(state));
+    } catch {
+      // ignore
+    }
+  }
+
+  initRealtimeListeners() {
+    if (typeof BroadcastChannel !== 'undefined') {
+      this.channel = new BroadcastChannel('smartpiggy_cloud_realtime_v2');
+      this.channel.onmessage = (event) => {
+        const msg = event.data;
+        if (msg && msg.type === 'CRDT_STATE_BROADCAST' && msg.familyCode === this.familyCode && msg.state) {
+          if (typeof this.onRemoteStateMerged === 'function') {
+            this.onRemoteStateMerged(msg.state, 'Tiempo Real Multi-Ventana');
+          }
+        }
+      };
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === this.getStorageKey(this.familyCode) && e.newValue) {
+        try {
+          const remoteState = JSON.parse(e.newValue);
+          if (typeof this.onRemoteStateMerged === 'function') {
+            this.onRemoteStateMerged(remoteState, 'Almacenamiento Local');
+          }
+        } catch {
+          // ignore
+        }
+      }
+    });
+  }
+
+  /**
+   * Inicia el canal WebSocket Phoenix en tiempo real con Supabase (`wss://<project>.supabase.co/realtime/v1/websocket`)
+   * y el ciclo de reconciliación continua sin necesidad de botón manual.
+   */
+  startPolling(getCurrentStateFn) {
+    this.getCurrentStateFn = getCurrentStateFn;
+    this.connectRealtimeStream();
+
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    const intervalMs = Math.max(3, Number(this.cloudConfig.autoSyncSeconds || 4)) * 1000;
+    this.pollTimer = setInterval(async () => {
+      const currentState = this.getCurrentStateFn ? this.getCurrentStateFn() : null;
+      if (currentState) {
+        await this.pullFromCloud(currentState, true);
+      }
+    }, intervalMs);
+  }
+
+  getSupabaseTopic() {
+    return `realtime:smartpiggy_${this.familyCode}`;
+  }
+
+  closeRealtimeSocket() {
+    if (this.wsHeartbeatTimer) {
+      clearInterval(this.wsHeartbeatTimer);
+      this.wsHeartbeatTimer = null;
+    }
+    if (this.wsReconnectTimer) {
+      clearTimeout(this.wsReconnectTimer);
+      this.wsReconnectTimer = null;
+    }
+    if (this.ws) {
+      try {
+        this.ws.onclose = null;
+        this.ws.close();
+      } catch {
+        // ignore
+      }
+      this.ws = null;
+    }
+    this.wsConnected = false;
+  }
+
+  /**
+   * Conecta directamente al WebSocket Realtime de Supabase del proyecto existente del usuario.
+   */
+  connectRealtimeStream() {
+    this.closeRealtimeSocket();
+
+    const { provider, endpointUrl, apiKey } = this.cloudConfig;
+    if (provider !== 'SUPABASE_REST' || !endpointUrl || !apiKey) {
+      return;
+    }
+
+    try {
+      const cleanBase = endpointUrl.trim().replace(/\/+$/, '');
+      const wsBase = cleanBase.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
+      const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${encodeURIComponent(apiKey.trim())}&vsn=1.0.0`;
+
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this.wsConnected = true;
+        const joinPayload = {
+          topic: this.getSupabaseTopic(),
+          event: 'phx_join',
+          payload: {
+            config: {
+              broadcast: { ack: false, self: false },
+              presence: { key: '' },
+              postgres_changes: [
+                {
+                  event: '*',
+                  schema: 'public',
+                  table: this.tableName,
+                  filter: `family_code=eq.${this.familyCode}`
+                }
+              ]
+            },
+            access_token: apiKey.trim()
+          },
+          ref: String(this.wsRefCounter++)
+        };
+        this.ws.send(JSON.stringify(joinPayload));
+        this.notifyStatus('SYNCED', 'Supabase Realtime WebSocket Activo');
+
+        this.wsHeartbeatTimer = setInterval(() => {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(
+              JSON.stringify({
+                topic: 'phoenix',
+                event: 'heartbeat',
+                payload: {},
+                ref: String(this.wsRefCounter++)
+              })
+            );
+          }
+        }, 25000);
+      };
+
+      this.ws.onmessage = async (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          // 1. Broadcast en tiempo real directo entre dispositivos (< 50ms)
+          if (msg.event === 'broadcast' && msg.payload?.event === 'crdt_state' && msg.payload?.payload?.state) {
+            const incomingState = msg.payload.payload.state;
+            if (typeof this.onRemoteStateMerged === 'function') {
+              this.onRemoteStateMerged(incomingState, 'Supabase Realtime Broadcast');
+            }
+            this.notifyStatus('SYNCED', 'Supabase Realtime Recibido');
+          }
+          // 2. Notificación Postgres Changes desde la tabla `public.smartpiggy_families`
+          if (msg.event === 'postgres_changes') {
+            const recordPayload = msg.payload?.data?.record?.payload || msg.payload?.record?.payload;
+            if (recordPayload && recordPayload.family && typeof this.onRemoteStateMerged === 'function') {
+              this.onRemoteStateMerged(recordPayload, 'Supabase PostgreSQL Realtime');
+              this.notifyStatus('SYNCED', 'Supabase DB Realtime');
+            } else if (this.getCurrentStateFn) {
+              await this.pullFromCloud(this.getCurrentStateFn(), true);
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      this.ws.onclose = () => {
+        this.wsConnected = false;
+        this.wsReconnectTimer = setTimeout(() => this.connectRealtimeStream(), 5000);
+      };
+    } catch {
+      this.wsConnected = false;
+    }
+  }
+
+  notifyStatus(status, detail = '', tableMissing = false) {
+    if (typeof this.onSyncStatusChange === 'function') {
+      this.onSyncStatusChange({
+        status,
+        detail,
+        provider: this.cloudConfig.provider,
+        wsConnected: this.wsConnected,
+        serverAvailable: this.serverAvailable,
+        tableMissing,
+        timestamp: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      });
+    }
+  }
+
+  /**
+   * Se invoca automáticamente en cada cambio de datos (sin botón manual).
+   * Envía el cambio instantáneamente por WebSocket + persiste en Supabase PostgreSQL (`public.smartpiggy_families`).
+   */
+  async pushState(state) {
+    if (!state || !state.family) return;
+    this.saveLocalState(state);
+
+    // 1. BroadcastChannel local entre ventanas del mismo navegador
+    if (this.channel) {
+      this.channel.postMessage({
+        type: 'CRDT_STATE_BROADCAST',
+        familyCode: this.familyCode,
+        state
+      });
+    }
+
+    // 2. Si el WebSocket de Supabase Realtime está abierto, emitir broadcast instantáneo (< 50ms)
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        this.ws.send(
+          JSON.stringify({
+            topic: this.getSupabaseTopic(),
+            event: 'broadcast',
+            payload: {
+              type: 'broadcast',
+              event: 'crdt_state',
+              payload: {
+                familyCode: this.familyCode,
+                state
+              }
+            },
+            ref: String(this.wsRefCounter++)
+          })
+        );
+      } catch {
+        // ignore ws send error
+      }
+    }
+
+    this.notifyStatus('SYNCING', 'Sincronizando en tiempo real...');
+
+    try {
+      const provider = this.cloudConfig.provider;
+
+      // A. Proveedor Principal: SUPABASE (en el proyecto actual del usuario)
+      if (provider === 'SUPABASE_REST' && this.cloudConfig.endpointUrl && this.cloudConfig.apiKey) {
+        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
+        const key = this.cloudConfig.apiKey.trim();
+        const url = `${base}/rest/v1/${encodeURIComponent(this.tableName)}?on_conflict=family_code`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            Prefer: 'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify({
+            family_code: this.familyCode,
+            payload: state,
+            updated_at: new Date().toISOString()
+          })
+        });
+
+        if (res.status === 404 || res.status === 400) {
+          this.notifyStatus(
+            this.wsConnected ? 'SYNCED' : 'LOCAL_READY',
+            this.wsConnected
+              ? 'Realtime WebSocket Activo (Falta ejecutar SQL de tabla en Supabase)'
+              : 'Ejecuta el SQL de 1 tabla en tu proyecto Supabase',
+            true
+          );
+          return;
+        }
+
+        if (!res.ok) throw new Error(`Supabase HTTP ${res.status}`);
+        this.serverAvailable = true;
+        this.notifyStatus(
+          'SYNCED',
+          this.wsConnected ? 'Supabase Realtime + DB al día' : 'Sincronizado en Supabase DB'
+        );
+        return;
+      }
+
+      // B. Proveedor Alternativo: FIREBASE REALTIME DATABASE
+      if (provider === 'FIREBASE_RTDB' && this.cloudConfig.endpointUrl) {
+        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
+        const authQuery = this.cloudConfig.apiKey ? `?auth=${encodeURIComponent(this.cloudConfig.apiKey)}` : '';
+        const url = `${base}/smartpiggy_families/${encodeURIComponent(this.familyCode)}.json${authQuery}`;
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state)
+        });
+        if (!res.ok) throw new Error(`Firebase HTTP ${res.status}`);
+        this.serverAvailable = true;
+        this.notifyStatus('SYNCED', 'Firebase Tiempo Real Activo');
+        return;
+      }
+
+      // C. Servidor Cloud Local / LAN (`/api/cloud/:familyCode`)
+      if (window.location.protocol.startsWith('http')) {
+        const res = await fetch(`/api/cloud/${encodeURIComponent(this.familyCode)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state)
+        });
+        if (res.ok) {
+          const mergedFromServer = await res.json();
+          this.serverAvailable = true;
+          if (mergedFromServer && mergedFromServer.family && typeof this.onRemoteStateMerged === 'function') {
+            this.onRemoteStateMerged(mergedFromServer, 'Servidor Tiempo Real Local');
+          }
+          this.notifyStatus('SYNCED', 'Tiempo Real Activo');
+          return;
+        }
+      }
+
+      this.notifyStatus('LOCAL_READY', 'Tiempo Real Multi-Ventana Activo');
+    } catch {
+      this.notifyStatus('LOCAL_READY', 'Offline-First Activo (Auto-reconexión)');
+    }
+  }
+
+  /**
+   * Descarga y fusiona (CRDT G-Set) el estado desde Supabase o el servidor activo.
+   */
+  async pullFromCloud(currentState, silent = false) {
+    if (this.isSyncing) return currentState;
+    this.isSyncing = true;
+
+    try {
+      const provider = this.cloudConfig.provider;
+      let remoteState = null;
+
+      if (provider === 'SUPABASE_REST' && this.cloudConfig.endpointUrl && this.cloudConfig.apiKey) {
+        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
+        const key = this.cloudConfig.apiKey.trim();
+        const url = `${base}/rest/v1/${encodeURIComponent(this.tableName)}?family_code=eq.${encodeURIComponent(this.familyCode)}&select=payload`;
+        const res = await fetch(url, {
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`
+          }
+        });
+        if (res.status === 404) {
+          this.notifyStatus(
+            this.wsConnected ? 'SYNCED' : 'LOCAL_READY',
+            'Falta crear la tabla smartpiggy_families en tu proyecto Supabase',
+            true
+          );
+          return currentState;
+        }
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows[0]?.payload) {
+            remoteState = rows[0].payload;
+            this.serverAvailable = true;
+          } else if (Array.isArray(rows) && rows.length === 0 && currentState) {
+            // La tabla ya existe en el proyecto Supabase pero este family_code aún no se ha insertado: subirlo automáticamente
+            await this.pushState(currentState);
+            return currentState;
+          }
+        }
+      } else if (provider === 'FIREBASE_RTDB' && this.cloudConfig.endpointUrl) {
+        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
+        const authQuery = this.cloudConfig.apiKey ? `?auth=${encodeURIComponent(this.cloudConfig.apiKey)}` : '';
+        const url = `${base}/smartpiggy_families/${encodeURIComponent(this.familyCode)}.json${authQuery}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          remoteState = await res.json();
+          this.serverAvailable = true;
+        }
+      } else if (window.location.protocol.startsWith('http')) {
+        const res = await fetch(`/api/cloud/${encodeURIComponent(this.familyCode)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.family) {
+            remoteState = data;
+          }
+          this.serverAvailable = true;
+        }
+      }
+
+      if (remoteState && remoteState.family) {
+        const merged = mergeFamilyCRDT(currentState, remoteState);
+        this.saveLocalState(merged);
+        if (typeof this.onRemoteStateMerged === 'function') {
+          this.onRemoteStateMerged(merged, 'Supabase Cloud');
+        }
+        this.notifyStatus(
+          'SYNCED',
+          this.wsConnected ? 'Supabase Realtime Conectado' : 'Sincronizado en tiempo real'
+        );
+        return merged;
+      }
+
+      if (!silent) {
+        this.notifyStatus(
+          this.wsConnected || this.serverAvailable ? 'SYNCED' : 'LOCAL_READY',
+          this.wsConnected ? 'Supabase Realtime Conectado' : 'Tiempo Real Activo'
+        );
+      }
+      return currentState;
+    } catch {
+      return currentState;
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+}
+
+/* === MODULE: financial-engine.js === */
 /**
  * SmartPiggy Cloud - Motor Financiero Determinista y Reductor Event-Sourced (Ronda 2 Auditado)
  * - 100% aritmética en enteros (centavos) sin errores de punto flotante IEEE 754.
@@ -493,6 +1563,7 @@ async function auditLedgerEvents(events, familySaltHex, parentSigningKey = null)
  * - Inversiones a Plazo Fijo con cálculo de interés devengado diario y rescate anticipado.
  * - Motor idempotente de Ingresos Recurrentes sobre fechas calendario locales (YYYY-MM-DD).
  */
+
 function getTodayLocalDate() {
   const now = new Date();
   const year = now.getFullYear();
@@ -500,6 +1571,7 @@ function getTodayLocalDate() {
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
 function addDaysLocalDate(localDateStr, daysToAdd) {
   const [y, m, d] = String(localDateStr).split('-').map(Number);
   const dt = new Date(y, (m || 1) - 1, d || 1, 12, 0, 0);
@@ -509,6 +1581,7 @@ function addDaysLocalDate(localDateStr, daysToAdd) {
   const day = String(dt.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
 function addMonthsLocalDate(localDateStr, monthsToAdd) {
   const [y, m, d] = String(localDateStr).split('-').map(Number);
   const dt = new Date(y, (m || 1) - 1 + Number(monthsToAdd || 0), d || 1, 12, 0, 0);
@@ -517,6 +1590,7 @@ function addMonthsLocalDate(localDateStr, monthsToAdd) {
   const day = String(dt.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
 function diffDaysLocalDate(startLocalDate, endLocalDate) {
   const [y1, m1, d1] = String(startLocalDate).split('-').map(Number);
   const [y2, m2, d2] = String(endLocalDate).split('-').map(Number);
@@ -524,11 +1598,13 @@ function diffDaysLocalDate(startLocalDate, endLocalDate) {
   const t2 = new Date(y2, (m2 || 1) - 1, d2 || 1, 12, 0, 0).getTime();
   return Math.round((t2 - t1) / (1000 * 60 * 60 * 24));
 }
+
 function toCents(amountFloatOrStr) {
   const num = Number(String(amountFloatOrStr).replace(/[^0-9.-]/g, ''));
   if (Number.isNaN(num)) return 0;
   return Math.round(num * 100);
 }
+
 function formatMoneyCents(cents, currency = 'MXN', showSign = false) {
   const safeCents = Math.round(Number(cents || 0));
   const absVal = Math.abs(safeCents) / 100;
@@ -1249,976 +2325,7 @@ function deriveTaskBoard({ tasks = [], taskClaims = [], taskReviews = [], validE
   return board;
 }
 
-
-  /* === cloud-sync.js === */
-/**
- * SmartPiggy Cloud - Motor de Sincronización en Tiempo Real con Supabase (Proyecto Existente) + CRDT G-Set
- * Características clave:
- * 1. Reutiliza cualquier proyecto existente de Supabase mediante una única tabla aislada (`public.smartpiggy_families`)
- *    sin interferir con otras tablas ni requerir crear un proyecto nuevo.
- * 2. Sincronización 100% Automática en Tiempo Real (Cero botones manuales):
- *    - Canal WebSocket Phoenix de Supabase Realtime (`wss://<project>.supabase.co/realtime/v1/websocket`)
- *      escuchando tanto `broadcast` instantáneo (`crdt_state`) como `postgres_changes` en `public.smartpiggy_families`.
- *    - Persistencia REST JSONB automática (`POST /rest/v1/smartpiggy_families?on_conflict=family_code`).
- *    - Respaldo simultáneo en `BroadcastChannel` multi-ventana y servidor local `/api/cloud/:familyCode`.
- */
-
-const STORAGE_KEY_PREFIX = 'smartpiggy_cloud_state_v3_';
-const CLOUD_CONFIG_KEY = 'smartpiggy_cloud_provider_config_v2';
-
-const LEGACY_DEMO_IDS = new Set([
-  'child_sofia',
-  'child_mateo',
-  'parent_carlos',
-  'parent_elena',
-  'loan_sofia_artset',
-  'loan_mateo_headphones',
-  'inv_sofia_30d',
-  'inv_mateo_60d',
-  'rec_sofia_weekly',
-  'rec_mateo_biweekly',
-  'req_sofia_inv_01'
-]);
-
-function isLegacyDemoId(id = '') {
-  const s = String(id || '');
-  return (
-    LEGACY_DEMO_IDS.has(s) ||
-    s.startsWith('tx_seed_') ||
-    s.startsWith('det_rec_rec_sofia_') ||
-    s.startsWith('det_rec_rec_mateo_')
-  );
-}
-
-/**
- * Elimina cualquier registro demostrativo antiguo que haya quedado en localStorage o en Supabase
- * y garantiza que exista al menos un perfil Padre y un perfil Hijo limpio ($0.00).
- */
-function stripLegacyDemoData(state) {
-  if (!state || !state.family) return state;
-
-  const nowIso = new Date().toISOString();
-  state.family.deletedIds = state.family.deletedIds || {};
-  if (state.family.name === 'Familia García-Mendoza') {
-    state.family.name = 'Mi Familia';
-  }
-
-  const filterDemo = (arr = []) =>
-    (arr || []).filter(
-      (item) =>
-        item &&
-        item.id &&
-        !isLegacyDemoId(item.id) &&
-        !isLegacyDemoId(item.memberId) &&
-        !state.family.deletedIds[item.id]
-    );
-
-  state.members = filterDemo(state.members);
-  state.catalogs = (state.catalogs || []).filter((c) => c && c.id && !state.family.deletedIds[c.id]);
-  state.recurringRules = filterDemo(state.recurringRules);
-  state.loans = filterDemo(state.loans);
-  state.investments = filterDemo(state.investments);
-  state.childRequests = filterDemo(state.childRequests);
-  state.ledgerEvents = filterDemo(state.ledgerEvents);
-  state.tasks = (state.tasks || []).filter((t) => t && t.id && !state.family.deletedIds[t.id]);
-  state.taskClaims = filterDemo(state.taskClaims);
-  state.taskReviews = filterDemo(state.taskReviews);
-  if (Array.isArray(state.finePresets)) {
-    state.finePresets = state.finePresets.filter((p) => p && p.id && !state.family.deletedIds[p.id]);
-  }
-
-  if (!state.members.some((m) => m.role === 'PARENT')) {
-    state.members.unshift({
-      id: 'parent_admin',
-      familyId: state.family.id,
-      role: 'PARENT',
-      name: 'Papá / Mamá',
-      title: 'Administrador Familiar',
-      avatar: 'parent-male',
-      themeColor: '#6366f1',
-      createdAt: nowIso,
-      updatedAt: nowIso
-    });
-  }
-
-  if (!state.members.some((m) => m.role === 'CHILD')) {
-    state.members.push({
-      id: 'child_principal',
-      familyId: state.family.id,
-      role: 'CHILD',
-      name: 'Mi Alcancía',
-      age: 10,
-      avatar: 'piggy',
-      themeColor: '#10b981',
-      goalTitle: 'Mi Meta de Ahorro',
-      goalTargetCents: 100000,
-      goalIcon: 'target',
-      createdAt: nowIso,
-      updatedAt: nowIso
-    });
-  }
-
-  return state;
-}
-
-function mergeEntityCollection(localArr = [], remoteArr = [], deletedIdsMap = {}) {
-  const map = new Map();
-
-  for (const item of localArr) {
-    if (item && item.id && !deletedIdsMap[item.id] && !isLegacyDemoId(item.id) && !isLegacyDemoId(item.memberId)) {
-      map.set(item.id, item);
-    }
-  }
-
-  for (const rItem of remoteArr) {
-    if (!rItem || !rItem.id || deletedIdsMap[rItem.id] || isLegacyDemoId(rItem.id) || isLegacyDemoId(rItem.memberId)) {
-      continue;
-    }
-    const existing = map.get(rItem.id);
-    if (!existing) {
-      map.set(rItem.id, rItem);
-    } else {
-      const localTime = String(existing.updatedAt || existing.createdAt || '');
-      const remoteTime = String(rItem.updatedAt || rItem.createdAt || '');
-      if (remoteTime > localTime) {
-        map.set(rItem.id, rItem);
-      } else if (remoteTime === localTime) {
-        // Desempate determinista (p.ej. dos papás firmando el mismo evento con ID determinista al mismo tiempo):
-        // gana el hash/huella menor para que todos los dispositivos converjan al mismo registro.
-        const lKey = String(existing.eventHash || JSON.stringify(existing));
-        const rKey = String(rItem.eventHash || JSON.stringify(rItem));
-        if (rKey < lKey) map.set(rItem.id, rItem);
-      }
-    }
-  }
-
-  return Array.from(map.values());
-}
-
-/**
- * Fusión CRDT determinista con soporte para Tombstones (`deletedIds`), `resetEpoch` y limpieza de datos de prueba.
- */
-function mergeFamilyCRDT(localState, remoteState) {
-  if (!remoteState || !remoteState.family) return stripLegacyDemoData(localState);
-  if (!localState || !localState.family) return stripLegacyDemoData(remoteState);
-
-  const cleanLocal = stripLegacyDemoData(localState);
-  const cleanRemote = stripLegacyDemoData(remoteState);
-
-  const localEpoch = Number(cleanLocal.family.resetEpoch || 0);
-  const remoteEpoch = Number(cleanRemote.family.resetEpoch || 0);
-  if (localEpoch > remoteEpoch && remoteEpoch > 0) {
-    return cleanLocal;
-  }
-  if (remoteEpoch > localEpoch && localEpoch > 0) {
-    return cleanRemote;
-  }
-
-  const mergedDeletedIds = {
-    ...(cleanLocal.family.deletedIds || {}),
-    ...(cleanRemote.family.deletedIds || {})
-  };
-
-  const localFamUpdated = String(cleanLocal.family.updatedAt || '');
-  const remoteFamUpdated = String(cleanRemote.family.updatedAt || '');
-  const mergedFamily =
-    remoteFamUpdated >= localFamUpdated
-      ? { ...cleanLocal.family, ...cleanRemote.family, deletedIds: mergedDeletedIds, resetEpoch: Math.max(localEpoch, remoteEpoch) }
-      : { ...cleanRemote.family, ...cleanLocal.family, deletedIds: mergedDeletedIds, resetEpoch: Math.max(localEpoch, remoteEpoch) };
-
-  return stripLegacyDemoData({
-    family: mergedFamily,
-    members: mergeEntityCollection(cleanLocal.members, cleanRemote.members, mergedDeletedIds),
-    catalogs: mergeEntityCollection(cleanLocal.catalogs, cleanRemote.catalogs, mergedDeletedIds),
-    recurringRules: mergeEntityCollection(cleanLocal.recurringRules, cleanRemote.recurringRules, mergedDeletedIds),
-    loans: mergeEntityCollection(cleanLocal.loans, cleanRemote.loans, mergedDeletedIds),
-    investments: mergeEntityCollection(cleanLocal.investments, cleanRemote.investments, mergedDeletedIds),
-    childRequests: mergeEntityCollection(cleanLocal.childRequests, cleanRemote.childRequests, mergedDeletedIds),
-    ledgerEvents: mergeEntityCollection(cleanLocal.ledgerEvents, cleanRemote.ledgerEvents, mergedDeletedIds),
-    tasks: mergeEntityCollection(cleanLocal.tasks, cleanRemote.tasks, mergedDeletedIds),
-    taskClaims: mergeEntityCollection(cleanLocal.taskClaims, cleanRemote.taskClaims, mergedDeletedIds),
-    taskReviews: mergeEntityCollection(cleanLocal.taskReviews, cleanRemote.taskReviews, mergedDeletedIds),
-    finePresets: mergeEntityCollection(cleanLocal.finePresets, cleanRemote.finePresets, mergedDeletedIds),
-    lastSyncedAt: new Date().toISOString()
-  });
-}
-class CloudSyncManager {
-  constructor({ onRemoteStateMerged, onSyncStatusChange }) {
-    this.onRemoteStateMerged = onRemoteStateMerged;
-    this.onSyncStatusChange = onSyncStatusChange;
-    this.channel = null;
-    this.pollTimer = null;
-    this.ws = null;
-    this.wsHeartbeatTimer = null;
-    this.wsReconnectTimer = null;
-    this.wsConnected = false;
-    this.wsRefCounter = 1;
-    this.familyCode = 'FAM-2026-KIDS';
-    this.tableName = 'smartpiggy_families';
-    this.cloudConfig = this.loadCloudConfig();
-    this.isSyncing = false;
-    this.serverAvailable = false;
-    this.getCurrentStateFn = null;
-
-    this.initRealtimeListeners();
-  }
-
-  loadCloudConfig() {
-    try {
-      const raw = localStorage.getItem(CLOUD_CONFIG_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          provider: parsed.provider || 'SUPABASE_REST',
-          endpointUrl: parsed.endpointUrl || '',
-          apiKey: parsed.apiKey || '',
-          tableName: parsed.tableName || 'smartpiggy_families',
-          autoSyncSeconds: 4
-        };
-      }
-    } catch {
-      // ignore
-    }
-    return {
-      provider: 'SUPABASE_REST',
-      endpointUrl: '',
-      apiKey: '',
-      tableName: 'smartpiggy_families',
-      autoSyncSeconds: 4
-    };
-  }
-
-  saveCloudConfig(newConfig) {
-    this.cloudConfig = { ...this.cloudConfig, ...newConfig };
-    this.tableName = (this.cloudConfig.tableName || 'smartpiggy_families').trim();
-    try {
-      localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(this.cloudConfig));
-    } catch {
-      // ignore
-    }
-    this.connectRealtimeStream();
-  }
-
-  getStorageKey(familyCode = this.familyCode) {
-    const clean = String(familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
-    return `${STORAGE_KEY_PREFIX}${clean}`;
-  }
-
-  loadLocalState(familyCode = this.familyCode) {
-    this.familyCode = String(familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
-    try {
-      // Limpiar versiones previas que contenían datos de prueba
-      localStorage.removeItem(`smartpiggy_cloud_state_v2_${this.familyCode}`);
-      const raw = localStorage.getItem(this.getStorageKey(this.familyCode));
-      if (raw) {
-        return stripLegacyDemoData(JSON.parse(raw));
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  }
-
-  saveLocalState(state) {
-    if (!state || !state.family) return;
-    this.familyCode = String(state.family.familyCode || 'FAM-2026-KIDS').trim().toUpperCase();
-    try {
-      localStorage.setItem(this.getStorageKey(this.familyCode), JSON.stringify(state));
-    } catch {
-      // ignore
-    }
-  }
-
-  initRealtimeListeners() {
-    if (typeof BroadcastChannel !== 'undefined') {
-      this.channel = new BroadcastChannel('smartpiggy_cloud_realtime_v2');
-      this.channel.onmessage = (event) => {
-        const msg = event.data;
-        if (msg && msg.type === 'CRDT_STATE_BROADCAST' && msg.familyCode === this.familyCode && msg.state) {
-          if (typeof this.onRemoteStateMerged === 'function') {
-            this.onRemoteStateMerged(msg.state, 'Tiempo Real Multi-Ventana');
-          }
-        }
-      };
-    }
-
-    window.addEventListener('storage', (e) => {
-      if (e.key === this.getStorageKey(this.familyCode) && e.newValue) {
-        try {
-          const remoteState = JSON.parse(e.newValue);
-          if (typeof this.onRemoteStateMerged === 'function') {
-            this.onRemoteStateMerged(remoteState, 'Almacenamiento Local');
-          }
-        } catch {
-          // ignore
-        }
-      }
-    });
-  }
-
-  /**
-   * Inicia el canal WebSocket Phoenix en tiempo real con Supabase (`wss://<project>.supabase.co/realtime/v1/websocket`)
-   * y el ciclo de reconciliación continua sin necesidad de botón manual.
-   */
-  startPolling(getCurrentStateFn) {
-    this.getCurrentStateFn = getCurrentStateFn;
-    this.connectRealtimeStream();
-
-    if (this.pollTimer) clearInterval(this.pollTimer);
-    const intervalMs = Math.max(3, Number(this.cloudConfig.autoSyncSeconds || 4)) * 1000;
-    this.pollTimer = setInterval(async () => {
-      const currentState = this.getCurrentStateFn ? this.getCurrentStateFn() : null;
-      if (currentState) {
-        await this.pullFromCloud(currentState, true);
-      }
-    }, intervalMs);
-  }
-
-  getSupabaseTopic() {
-    return `realtime:smartpiggy_${this.familyCode}`;
-  }
-
-  closeRealtimeSocket() {
-    if (this.wsHeartbeatTimer) {
-      clearInterval(this.wsHeartbeatTimer);
-      this.wsHeartbeatTimer = null;
-    }
-    if (this.wsReconnectTimer) {
-      clearTimeout(this.wsReconnectTimer);
-      this.wsReconnectTimer = null;
-    }
-    if (this.ws) {
-      try {
-        this.ws.onclose = null;
-        this.ws.close();
-      } catch {
-        // ignore
-      }
-      this.ws = null;
-    }
-    this.wsConnected = false;
-  }
-
-  /**
-   * Conecta directamente al WebSocket Realtime de Supabase del proyecto existente del usuario.
-   */
-  connectRealtimeStream() {
-    this.closeRealtimeSocket();
-
-    const { provider, endpointUrl, apiKey } = this.cloudConfig;
-    if (provider !== 'SUPABASE_REST' || !endpointUrl || !apiKey) {
-      return;
-    }
-
-    try {
-      const cleanBase = endpointUrl.trim().replace(/\/+$/, '');
-      const wsBase = cleanBase.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
-      const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${encodeURIComponent(apiKey.trim())}&vsn=1.0.0`;
-
-      this.ws = new WebSocket(wsUrl);
-
-      this.ws.onopen = () => {
-        this.wsConnected = true;
-        const joinPayload = {
-          topic: this.getSupabaseTopic(),
-          event: 'phx_join',
-          payload: {
-            config: {
-              broadcast: { ack: false, self: false },
-              presence: { key: '' },
-              postgres_changes: [
-                {
-                  event: '*',
-                  schema: 'public',
-                  table: this.tableName,
-                  filter: `family_code=eq.${this.familyCode}`
-                }
-              ]
-            },
-            access_token: apiKey.trim()
-          },
-          ref: String(this.wsRefCounter++)
-        };
-        this.ws.send(JSON.stringify(joinPayload));
-        this.notifyStatus('SYNCED', 'Supabase Realtime WebSocket Activo');
-
-        this.wsHeartbeatTimer = setInterval(() => {
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(
-              JSON.stringify({
-                topic: 'phoenix',
-                event: 'heartbeat',
-                payload: {},
-                ref: String(this.wsRefCounter++)
-              })
-            );
-          }
-        }, 25000);
-      };
-
-      this.ws.onmessage = async (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          // 1. Broadcast en tiempo real directo entre dispositivos (< 50ms)
-          if (msg.event === 'broadcast' && msg.payload?.event === 'crdt_state' && msg.payload?.payload?.state) {
-            const incomingState = msg.payload.payload.state;
-            if (typeof this.onRemoteStateMerged === 'function') {
-              this.onRemoteStateMerged(incomingState, 'Supabase Realtime Broadcast');
-            }
-            this.notifyStatus('SYNCED', 'Supabase Realtime Recibido');
-          }
-          // 2. Notificación Postgres Changes desde la tabla `public.smartpiggy_families`
-          if (msg.event === 'postgres_changes') {
-            const recordPayload = msg.payload?.data?.record?.payload || msg.payload?.record?.payload;
-            if (recordPayload && recordPayload.family && typeof this.onRemoteStateMerged === 'function') {
-              this.onRemoteStateMerged(recordPayload, 'Supabase PostgreSQL Realtime');
-              this.notifyStatus('SYNCED', 'Supabase DB Realtime');
-            } else if (this.getCurrentStateFn) {
-              await this.pullFromCloud(this.getCurrentStateFn(), true);
-            }
-          }
-        } catch {
-          // ignore parse errors
-        }
-      };
-
-      this.ws.onclose = () => {
-        this.wsConnected = false;
-        this.wsReconnectTimer = setTimeout(() => this.connectRealtimeStream(), 5000);
-      };
-    } catch {
-      this.wsConnected = false;
-    }
-  }
-
-  notifyStatus(status, detail = '', tableMissing = false) {
-    if (typeof this.onSyncStatusChange === 'function') {
-      this.onSyncStatusChange({
-        status,
-        detail,
-        provider: this.cloudConfig.provider,
-        wsConnected: this.wsConnected,
-        serverAvailable: this.serverAvailable,
-        tableMissing,
-        timestamp: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      });
-    }
-  }
-
-  /**
-   * Se invoca automáticamente en cada cambio de datos (sin botón manual).
-   * Envía el cambio instantáneamente por WebSocket + persiste en Supabase PostgreSQL (`public.smartpiggy_families`).
-   */
-  async pushState(state) {
-    if (!state || !state.family) return;
-    this.saveLocalState(state);
-
-    // 1. BroadcastChannel local entre ventanas del mismo navegador
-    if (this.channel) {
-      this.channel.postMessage({
-        type: 'CRDT_STATE_BROADCAST',
-        familyCode: this.familyCode,
-        state
-      });
-    }
-
-    // 2. Si el WebSocket de Supabase Realtime está abierto, emitir broadcast instantáneo (< 50ms)
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      try {
-        this.ws.send(
-          JSON.stringify({
-            topic: this.getSupabaseTopic(),
-            event: 'broadcast',
-            payload: {
-              type: 'broadcast',
-              event: 'crdt_state',
-              payload: {
-                familyCode: this.familyCode,
-                state
-              }
-            },
-            ref: String(this.wsRefCounter++)
-          })
-        );
-      } catch {
-        // ignore ws send error
-      }
-    }
-
-    this.notifyStatus('SYNCING', 'Sincronizando en tiempo real...');
-
-    try {
-      const provider = this.cloudConfig.provider;
-
-      // A. Proveedor Principal: SUPABASE (en el proyecto actual del usuario)
-      if (provider === 'SUPABASE_REST' && this.cloudConfig.endpointUrl && this.cloudConfig.apiKey) {
-        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
-        const key = this.cloudConfig.apiKey.trim();
-        const url = `${base}/rest/v1/${encodeURIComponent(this.tableName)}?on_conflict=family_code`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            Prefer: 'resolution=merge-duplicates,return=minimal'
-          },
-          body: JSON.stringify({
-            family_code: this.familyCode,
-            payload: state,
-            updated_at: new Date().toISOString()
-          })
-        });
-
-        if (res.status === 404 || res.status === 400) {
-          this.notifyStatus(
-            this.wsConnected ? 'SYNCED' : 'LOCAL_READY',
-            this.wsConnected
-              ? 'Realtime WebSocket Activo (Falta ejecutar SQL de tabla en Supabase)'
-              : 'Ejecuta el SQL de 1 tabla en tu proyecto Supabase',
-            true
-          );
-          return;
-        }
-
-        if (!res.ok) throw new Error(`Supabase HTTP ${res.status}`);
-        this.serverAvailable = true;
-        this.notifyStatus(
-          'SYNCED',
-          this.wsConnected ? 'Supabase Realtime + DB al día' : 'Sincronizado en Supabase DB'
-        );
-        return;
-      }
-
-      // B. Proveedor Alternativo: FIREBASE REALTIME DATABASE
-      if (provider === 'FIREBASE_RTDB' && this.cloudConfig.endpointUrl) {
-        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
-        const authQuery = this.cloudConfig.apiKey ? `?auth=${encodeURIComponent(this.cloudConfig.apiKey)}` : '';
-        const url = `${base}/smartpiggy_families/${encodeURIComponent(this.familyCode)}.json${authQuery}`;
-        const res = await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state)
-        });
-        if (!res.ok) throw new Error(`Firebase HTTP ${res.status}`);
-        this.serverAvailable = true;
-        this.notifyStatus('SYNCED', 'Firebase Tiempo Real Activo');
-        return;
-      }
-
-      // C. Servidor Cloud Local / LAN (`/api/cloud/:familyCode`)
-      if (window.location.protocol.startsWith('http')) {
-        const res = await fetch(`/api/cloud/${encodeURIComponent(this.familyCode)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state)
-        });
-        if (res.ok) {
-          const mergedFromServer = await res.json();
-          this.serverAvailable = true;
-          if (mergedFromServer && mergedFromServer.family && typeof this.onRemoteStateMerged === 'function') {
-            this.onRemoteStateMerged(mergedFromServer, 'Servidor Tiempo Real Local');
-          }
-          this.notifyStatus('SYNCED', 'Tiempo Real Activo');
-          return;
-        }
-      }
-
-      this.notifyStatus('LOCAL_READY', 'Tiempo Real Multi-Ventana Activo');
-    } catch {
-      this.notifyStatus('LOCAL_READY', 'Offline-First Activo (Auto-reconexión)');
-    }
-  }
-
-  /**
-   * Descarga y fusiona (CRDT G-Set) el estado desde Supabase o el servidor activo.
-   */
-  async pullFromCloud(currentState, silent = false) {
-    if (this.isSyncing) return currentState;
-    this.isSyncing = true;
-
-    try {
-      const provider = this.cloudConfig.provider;
-      let remoteState = null;
-
-      if (provider === 'SUPABASE_REST' && this.cloudConfig.endpointUrl && this.cloudConfig.apiKey) {
-        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
-        const key = this.cloudConfig.apiKey.trim();
-        const url = `${base}/rest/v1/${encodeURIComponent(this.tableName)}?family_code=eq.${encodeURIComponent(this.familyCode)}&select=payload`;
-        const res = await fetch(url, {
-          headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`
-          }
-        });
-        if (res.status === 404) {
-          this.notifyStatus(
-            this.wsConnected ? 'SYNCED' : 'LOCAL_READY',
-            'Falta crear la tabla smartpiggy_families en tu proyecto Supabase',
-            true
-          );
-          return currentState;
-        }
-        if (res.ok) {
-          const rows = await res.json();
-          if (Array.isArray(rows) && rows[0]?.payload) {
-            remoteState = rows[0].payload;
-            this.serverAvailable = true;
-          } else if (Array.isArray(rows) && rows.length === 0 && currentState) {
-            // La tabla ya existe en el proyecto Supabase pero este family_code aún no se ha insertado: subirlo automáticamente
-            await this.pushState(currentState);
-            return currentState;
-          }
-        }
-      } else if (provider === 'FIREBASE_RTDB' && this.cloudConfig.endpointUrl) {
-        const base = this.cloudConfig.endpointUrl.trim().replace(/\/+$/, '');
-        const authQuery = this.cloudConfig.apiKey ? `?auth=${encodeURIComponent(this.cloudConfig.apiKey)}` : '';
-        const url = `${base}/smartpiggy_families/${encodeURIComponent(this.familyCode)}.json${authQuery}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          remoteState = await res.json();
-          this.serverAvailable = true;
-        }
-      } else if (window.location.protocol.startsWith('http')) {
-        const res = await fetch(`/api/cloud/${encodeURIComponent(this.familyCode)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.family) {
-            remoteState = data;
-          }
-          this.serverAvailable = true;
-        }
-      }
-
-      if (remoteState && remoteState.family) {
-        const merged = mergeFamilyCRDT(currentState, remoteState);
-        this.saveLocalState(merged);
-        if (typeof this.onRemoteStateMerged === 'function') {
-          this.onRemoteStateMerged(merged, 'Supabase Cloud');
-        }
-        this.notifyStatus(
-          'SYNCED',
-          this.wsConnected ? 'Supabase Realtime Conectado' : 'Sincronizado en tiempo real'
-        );
-        return merged;
-      }
-
-      if (!silent) {
-        this.notifyStatus(
-          this.wsConnected || this.serverAvailable ? 'SYNCED' : 'LOCAL_READY',
-          this.wsConnected ? 'Supabase Realtime Conectado' : 'Tiempo Real Activo'
-        );
-      }
-      return currentState;
-    } catch {
-      return currentState;
-    } finally {
-      this.isSyncing = false;
-    }
-  }
-}
-
-
-  /* === seed-data.js === */
-/**
- * SmartPiggy Cloud - Estado Inicial Limpio (Sin datos de prueba)
- * Crea la estructura base de la familia con saldo $0.00, sin movimientos ni préstamos de prueba,
- * lista para registrar integrantes y movimientos reales con iconografía 100% SVG.
- */
-const DEFAULT_DEMO_PIN = '1234';
-async function buildInitialSignedFamilyState(customFamilyCode = 'FAM-2026-KIDS', initialPin = DEFAULT_DEMO_PIN) {
-  const nowIso = new Date().toISOString();
-  const saltHex = generateSaltHex(16);
-  const { authVerifier } = await deriveParentKeyBundle(initialPin, saltHex);
-
-  const family = {
-    id: 'fam_smartpiggy_01',
-    familyCode: customFamilyCode,
-    name: 'Mi Familia',
-    currency: 'MXN',
-    saltHex,
-    authVerifier,
-    resetEpoch: Date.now(),
-    deletedIds: {},
-    createdAt: nowIso,
-    updatedAt: nowIso
-  };
-
-  const members = [
-    {
-      id: 'parent_admin',
-      familyId: family.id,
-      role: 'PARENT',
-      name: 'Papá / Mamá',
-      title: 'Administrador Familiar',
-      avatar: 'parent-male',
-      themeColor: '#6366f1',
-      createdAt: nowIso,
-      updatedAt: nowIso
-    },
-    {
-      id: 'child_principal',
-      familyId: family.id,
-      role: 'CHILD',
-      name: 'Mi Alcancía',
-      age: 10,
-      avatar: 'piggy',
-      themeColor: '#10b981',
-      goalTitle: 'Mi Meta de Ahorro',
-      goalTargetCents: 100000, // $1,000.00
-      goalIcon: 'target',
-      createdAt: nowIso,
-      updatedAt: nowIso
-    }
-  ];
-
-  const catalogs = [
-    // Fuentes de Ingresos (Iconos SVG)
-    {
-      id: 'cat_inc_allowance',
-      familyId: family.id,
-      type: 'INCOME_SOURCE',
-      name: 'Mesada / Domingo',
-      icon: 'calendar',
-      color: '#10b981',
-      description: 'Mesada periódica entregada por Papá o Mamá',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_inc_chores',
-      familyId: family.id,
-      type: 'INCOME_SOURCE',
-      name: 'Tareas Extra en Casa',
-      icon: 'sparkles',
-      color: '#06b6d4',
-      description: 'Ayudar en casa, jardín o lavar el auto',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_inc_grades',
-      familyId: family.id,
-      type: 'INCOME_SOURCE',
-      name: 'Buenas Calificaciones',
-      icon: 'trophy',
-      color: '#f59e0b',
-      description: 'Premio por esfuerzo escolar y lectura',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_inc_gift',
-      familyId: family.id,
-      type: 'INCOME_SOURCE',
-      name: 'Regalo / Cumpleaños',
-      icon: 'gift',
-      color: '#8b5cf6',
-      description: 'Regalos de familiares o fechas especiales',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_inc_yield',
-      familyId: family.id,
-      type: 'INCOME_SOURCE',
-      name: 'Ganancia por Guardar a Plazo',
-      icon: 'trending-up',
-      color: '#14b8a6',
-      description: 'Premio ganado por ahorrar a plazo fijo',
-      isActive: true,
-      updatedAt: nowIso
-    },
-
-    // Categorías de Gastos (Iconos SVG)
-    {
-      id: 'cat_exp_snacks',
-      familyId: family.id,
-      type: 'EXPENSE_CATEGORY',
-      name: 'Dulces, Helados y Snacks',
-      icon: 'icecream',
-      color: '#ec4899',
-      description: 'Antojos, postres y salidas',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_exp_toys',
-      familyId: family.id,
-      type: 'EXPENSE_CATEGORY',
-      name: 'Juguetes y Juegos',
-      icon: 'puzzle',
-      color: '#f43f5e',
-      description: 'Juegos de mesa, figuras o pasatiempos',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_exp_games',
-      familyId: family.id,
-      type: 'EXPENSE_CATEGORY',
-      name: 'Videojuegos y Apps',
-      icon: 'gamepad',
-      color: '#6366f1',
-      description: 'Juegos digitales y accesorios',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_exp_books',
-      familyId: family.id,
-      type: 'EXPENSE_CATEGORY',
-      name: 'Libros, Arte y Deporte',
-      icon: 'palette',
-      color: '#0ea5e9',
-      description: 'Libros, dibujo y equipo deportivo',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_exp_outings',
-      familyId: family.id,
-      type: 'EXPENSE_CATEGORY',
-      name: 'Salidas con Amigos',
-      icon: 'popcorn',
-      color: '#f97316',
-      description: 'Cine, paseos y convivios',
-      isActive: true,
-      updatedAt: nowIso
-    },
-    {
-      id: 'cat_exp_loan',
-      familyId: family.id,
-      type: 'EXPENSE_CATEGORY',
-      name: 'Pago de Préstamo',
-      icon: 'credit-card',
-      color: '#a855f7',
-      description: 'Pagos a préstamos de Papá o Mamá',
-      isActive: true,
-      updatedAt: nowIso
-    }
-  ];
-
-  return {
-    family: {
-      ...family,
-      investmentPlans: buildDefaultInvestmentPlans(nowIso),
-      rulesConfig: buildDefaultRulesConfig(nowIso)
-    },
-    members,
-    catalogs,
-    recurringRules: [],
-    loans: [],
-    investments: [],
-    childRequests: [],
-    tasks: [],
-    taskClaims: [],
-    taskReviews: [],
-    finePresets: buildDefaultFinePresets(family.id, nowIso),
-    ledgerEvents: [],
-    lastSyncedAt: nowIso
-  };
-}
-
-/* ==========================================================================
-   TAREAS, MULTAS Y PLANES DE AHORRO (Propuesta final tras 2 rondas de revisión)
-   Montos en centavos MXN. Bandas de edad: '9_12' y '13_17'.
-   ========================================================================== */
-const AGE_BANDS = ['9_12', '13_17'];
-
-/** Plantillas de tareas (EXTRA = con pago; RESPONSIBILITY = responsabilidad sin pago). */
-const TASK_TEMPLATES = [
-  { id: 'tpl_car', kind: 'EXTRA', title: 'Lavar el coche', description: 'Por dentro y por fuera, sin dejar manchas.', iconKey: 'car', unit: 'ONCE', rewardByBand: { '9_12': 4000, '13_17': 7000 } },
-  { id: 'tpl_laundry', kind: 'EXTRA', title: 'Lavar y doblar la ropa de la familia', description: 'Separar colores, lavar, doblar y guardar.', iconKey: 'shirt', unit: 'ONCE', rewardByBand: { '9_12': 2000, '13_17': 3500 } },
-  { id: 'tpl_cook', kind: 'EXTRA', title: 'Ayudar a cocinar la comida del domingo', description: 'Ayudar a preparar y a dejar la cocina limpia.', iconKey: 'food', unit: 'ONCE', rewardByBand: { '9_12': 2500, '13_17': 4000 } },
-  { id: 'tpl_closet', kind: 'EXTRA', title: 'Organizar clóset o bodega', description: 'Ordenar, separar lo que ya no se usa y limpiar.', iconKey: 'broom', unit: 'ONCE', rewardByBand: { '9_12': 3000, '13_17': 5000 } },
-  { id: 'tpl_yard', kind: 'EXTRA', title: 'Limpiar patio o ventanas', description: 'Barrer, regar plantas o limpiar vidrios.', iconKey: 'plant', unit: 'ONCE', rewardByBand: { '9_12': 3500, '13_17': 6000 } },
-  { id: 'tpl_grocery', kind: 'EXTRA', title: 'Reto: lista del súper con presupuesto', description: 'Arma la lista de la semana sin pasarte del presupuesto que te demos.', iconKey: 'cart', unit: 'ONCE', rewardByBand: { '9_12': 2500, '13_17': 4000 } },
-  { id: 'tpl_book', kind: 'EXTRA', title: 'Reto: leer un libro y contarlo', description: 'Lee un libro completo y cuéntanos de qué trató.', iconKey: 'book', unit: 'ONCE', rewardByBand: { '9_12': 4000, '13_17': 6000 } },
-  { id: 'tpl_noscreens', kind: 'EXTRA', title: 'Reto: fin de semana sin pantallas', description: 'Sábado y domingo sin videojuegos ni redes sociales.', iconKey: 'phone', unit: 'WEEK', rewardByBand: { '9_12': 3000, '13_17': 5000 } },
-  { id: 'tpl_babysit', kind: 'EXTRA', title: 'Cuidar a un hermano menor 2 horas', description: 'Solo para 13 a 17 años. Cuidarlo con atención y sin pantallas.', iconKey: 'users', unit: 'ONCE', rewardByBand: { '9_12': 0, '13_17': 6000 } },
-  { id: 'tpl_bed', kind: 'RESPONSIBILITY', title: 'Tender tu cama', description: 'Responsabilidad diaria. No se paga: es parte de vivir en familia.', iconKey: 'bed', unit: 'WEEK', rewardByBand: { '9_12': 0, '13_17': 0 } },
-  { id: 'tpl_room', kind: 'RESPONSIBILITY', title: 'Recoger tu cuarto', description: 'Responsabilidad. No se paga.', iconKey: 'broom', unit: 'WEEK', rewardByBand: { '9_12': 0, '13_17': 0 } },
-  { id: 'tpl_dishes', kind: 'RESPONSIBILITY', title: 'Lavar tus trastes', description: 'Responsabilidad. No se paga.', iconKey: 'dish', unit: 'WEEK', rewardByBand: { '9_12': 0, '13_17': 0 } },
-  { id: 'tpl_trash', kind: 'RESPONSIBILITY', title: 'Tu turno de sacar la basura', description: 'Responsabilidad. No se paga.', iconKey: 'trash', unit: 'WEEK', rewardByBand: { '9_12': 0, '13_17': 0 } },
-  { id: 'tpl_homework', kind: 'RESPONSIBILITY', title: 'Hacer la tarea de la escuela', description: 'Responsabilidad. No se paga.', iconKey: 'book', unit: 'WEEK', rewardByBand: { '9_12': 0, '13_17': 0 } }
-];
-
-/** Límites de validación de multas por nivel (centavos) por banda de edad. */
-const FINE_LEVEL_LIMITS = {
-  LEVE: { '9_12': [500, 1000], '13_17': [1000, 2000] },
-  MEDIA: { '9_12': [1500, 3000], '13_17': [2500, 6000] },
-  GRAVE: { '9_12': [100, 8000], '13_17': [100, 15000] }
-};
-function buildDefaultFinePresets(familyId = 'fam_smartpiggy_01', nowIso = new Date().toISOString()) {
-  const base = { familyId, active: true, updatedAt: nowIso };
-  return [
-    { ...base, id: 'fine_lights', kind: 'FIXED', level: 'LEVE', title: 'Dejar luces o TV prendidas sin nadie', description: 'Cuidamos la energía y el dinero de la luz.', iconKey: 'bulb', amountByBand: { '9_12': 500, '13_17': 1000 } },
-    { ...base, id: 'fine_mess', kind: 'FIXED', level: 'LEVE', title: 'No recoger tus cosas después de 2 avisos', description: 'Se avisa dos veces antes de aplicar la multa.', iconKey: 'broom', amountByBand: { '9_12': 1000, '13_17': 1500 } },
-    { ...base, id: 'fine_food', kind: 'FIXED', level: 'LEVE', title: 'Desperdiciar comida a propósito', description: 'Servirte solo lo que te vas a comer.', iconKey: 'food', amountByBand: { '9_12': 500, '13_17': 1000 } },
-    { ...base, id: 'fine_phone', kind: 'FIXED', level: 'MEDIA', title: 'Usar el celular en horario no permitido', description: 'Durante la comida, en la noche o en horas de escuela.', iconKey: 'phone', amountByBand: { '9_12': 2000, '13_17': 4000 } },
-    { ...base, id: 'fine_respect', kind: 'FIXED', level: 'MEDIA', title: 'Groserías o faltas de respeto', description: 'Hablar con respeto a todos en casa.', iconKey: 'alert-triangle', amountByBand: { '9_12': 2500, '13_17': 5000 } },
-    { ...base, id: 'fine_screentime', kind: 'FIXED', level: 'MEDIA', title: 'Pasarte del tiempo de pantallas acordado', description: 'Respetar el tiempo de videojuegos y redes que acordamos.', iconKey: 'clock', amountByBand: { '9_12': 1500, '13_17': 2500 } },
-    { ...base, id: 'fine_broken', kind: 'REPAIR', level: 'GRAVE', title: 'Romper algo por descuido (reparación)', description: 'Pagas el 50% del costo hasta un tope. Si lo confiesas tú solo, pagas la mitad.', iconKey: 'broken', amountByBand: { '9_12': 8000, '13_17': 15000 } },
-    { ...base, id: 'fine_damage', kind: 'REPAIR', level: 'GRAVE', title: 'Dañar algo ajeno (escuela, vecino)', description: 'Ayudas a reparar con el 50% del costo hasta un tope. Si lo confiesas, pagas la mitad.', iconKey: 'broken', amountByBand: { '9_12': 8000, '13_17': 15000 } }
-  ];
-}
-function buildDefaultInvestmentPlans(nowIso = new Date().toISOString()) {
-  return [
-    { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBpsByBand: { '9_12': 100, '13_17': 75 }, minPrincipalCents: 5000, earlyExit: 'PRINCIPAL_ONLY', version: 1, updatedAt: nowIso },
-    { id: 'MEDIUM', label: 'Mediano plazo (6 meses)', termDays: 182, yieldBpsByBand: { '9_12': 620, '13_17': 500 }, minPrincipalCents: 10000, earlyExit: 'HALF_ACCRUED', version: 1, updatedAt: nowIso },
-    { id: 'LONG', label: 'Largo plazo (1 año)', termDays: 365, yieldBpsByBand: { '9_12': 1300, '13_17': 1200 }, minPrincipalCents: 20000, earlyExit: 'HALF_ACCRUED', version: 1, updatedAt: nowIso }
-  ];
-}
-function buildDefaultRulesConfig(nowIso = new Date().toISOString()) {
-  return {
-    taskMonthlyCapByBand: { '9_12': 30000, '13_17': 60000 },
-    fineMonthlyCapByBand: { '9_12': 10000, '13_17': 20000 },
-    fineMinCapByBand: { '9_12': 500, '13_17': 1000 },
-    fineIncomePct: 25,
-    investCapByBand: { '9_12': 150000, '13_17': 300000 },
-    updatedAt: nowIso
-  };
-}
-
-/**
- * Agrega a un estado existente (creado antes de esta versión) las colecciones y configuraciones nuevas
- * sin tocar los datos del usuario.
- */
-function ensureFeatureDefaults(state) {
-  if (!state || !state.family) return state;
-  state.tasks = Array.isArray(state.tasks) ? state.tasks : [];
-  state.taskClaims = Array.isArray(state.taskClaims) ? state.taskClaims : [];
-  state.taskReviews = Array.isArray(state.taskReviews) ? state.taskReviews : [];
-  if (!Array.isArray(state.finePresets)) {
-    const deleted = state.family.deletedIds || {};
-    state.finePresets = buildDefaultFinePresets(state.family.id, '2026-01-01T00:00:00.000Z').filter((p) => !deleted[p.id]);
-  }
-  if (!Array.isArray(state.family.investmentPlans) || state.family.investmentPlans.length !== 3) {
-    state.family.investmentPlans = buildDefaultInvestmentPlans('2026-01-01T00:00:00.000Z');
-  }
-  if (!state.family.rulesConfig || typeof state.family.rulesConfig !== 'object') {
-    state.family.rulesConfig = buildDefaultRulesConfig('2026-01-01T00:00:00.000Z');
-  }
-  if (!state.catalogs?.some((c) => c.id === 'cat_exp_fines')) {
-    state.catalogs = state.catalogs || [];
-    state.catalogs.push({
-      id: 'cat_exp_fines',
-      familyId: state.family.id,
-      type: 'EXPENSE_CATEGORY',
-      name: 'Multas y Reparaciones',
-      icon: 'scale',
-      color: '#ef4444',
-      description: 'Multas de las reglas de la casa',
-      isActive: true,
-      updatedAt: '2026-01-01T00:00:00.000Z'
-    });
-  }
-  return state;
-}
-
-
-  /* === rules-features.js === */
+/* === MODULE: rules-features.js === */
 /**
  * SmartPiggy Cloud - Tareas y Retos, Reglas de la Casa (Multas) y Planes de Ahorro preestablecidos.
  * Especificación final v1 tras 2 rondas de revisión (Agente de Propuesta vs. Agente de Controversia):
@@ -2230,10 +2337,6 @@ function ensureFeatureDefaults(state) {
  * - Planes de ahorro CORTO (1 mes), MEDIANO (6 meses) y LARGO (1 año) con tasas por banda de edad fijadas
  *   por los papás; cada inversión congela su tasa en el asiento firmado (sigVersion 2).
  */
-
-
-
-
 const TASK_ICON_KEYS = ['broom', 'dish', 'trash', 'bed', 'car', 'shirt', 'book', 'cart', 'plant', 'pet', 'phone', 'bulb', 'food', 'star', 'sparkles', 'users', 'trophy', 'flag', 'clock', 'target'];
 const FINE_ICON_KEYS = ['bulb', 'broom', 'food', 'phone', 'alert-triangle', 'clock', 'broken', 'scale', 'flag', 'x'];
 const LEVEL_META = {
@@ -2261,13 +2364,49 @@ function shortId() {
 function annualizedPct(bps, termDays) {
   return (Number(bps) / 100) * (365 / Math.max(1, Number(termDays)));
 }
+
 function installRulesFeatures(AppClass) {
   const methods = {
-    /* ----------------------------------------------------------------------
-       Utilidades de configuración
+  /* ----------------------------------------------------------------------
+       Utilidades de configuración (montos parejos sin distinción por edad)
        ---------------------------------------------------------------------- */
     getMemberBand(member) {
       return getAgeBand(member?.age);
+    },
+
+    getTaskRewardCents(task) {
+      if (!task || task.kind !== 'EXTRA') return 0;
+      if (Number.isFinite(Number(task.rewardCents)) && Number(task.rewardCents) > 0) {
+        return Math.round(Number(task.rewardCents));
+      }
+      return Math.max(Number(task.rewardByBand?.['13_17'] || 0), Number(task.rewardByBand?.['9_12'] || 0));
+    },
+
+    getPresetAmountCents(preset) {
+      if (!preset) return 0;
+      if (Number.isFinite(Number(preset.amountCents)) && Number(preset.amountCents) > 0) {
+        return Math.round(Number(preset.amountCents));
+      }
+      return Math.max(Number(preset.amountByBand?.['13_17'] || 0), Number(preset.amountByBand?.['9_12'] || 0));
+    },
+
+    getPlanYieldBps(plan) {
+      if (!plan) return 0;
+      if (Number.isFinite(Number(plan.yieldBps)) && Number(plan.yieldBps) > 0) {
+        return Math.round(Number(plan.yieldBps));
+      }
+      return Math.max(Number(plan.yieldBpsByBand?.['13_17'] || 0), Number(plan.yieldBpsByBand?.['9_12'] || 0));
+    },
+
+    getFineLevelBounds(level) {
+      const raw = FINE_LEVEL_LIMITS[level];
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw === 'object') {
+        const min = Math.min(Number(raw['9_12']?.[0] || 500), Number(raw['13_17']?.[0] || 500));
+        const max = Math.max(Number(raw['9_12']?.[1] || 2000), Number(raw['13_17']?.[1] || 2000));
+        return [min, max];
+      }
+      return [500, 20000];
     },
 
     getRulesConfig() {
@@ -2298,7 +2437,7 @@ function installRulesFeatures(AppClass) {
       if (Array.isArray(task.eligibleMemberIds) && task.eligibleMemberIds.length > 0 && !task.eligibleMemberIds.includes(member.id)) {
         return false;
       }
-      if (task.kind === 'EXTRA' && Number(task.rewardByBand?.[this.getMemberBand(member)] || 0) <= 0) return false;
+      if (task.kind === 'EXTRA' && this.getTaskRewardCents(task) <= 0) return false;
       return true;
     },
 
@@ -2392,7 +2531,7 @@ function installRulesFeatures(AppClass) {
           : toReview
               .map(({ b, a }) => {
                 const m = memberById.get(a.memberId) || { name: 'Hijo/a' };
-                const amount = b.task.kind === 'EXTRA' ? Number(b.task.rewardByBand?.[this.getMemberBand(m)] || 0) : 0;
+                const amount = this.getTaskRewardCents(b.task);
                 return `
                 <div class="tx-item">
                   <div class="tx-left">
@@ -2417,7 +2556,6 @@ function installRulesFeatures(AppClass) {
       // 2) Tareas abiertas
       const open = board.filter((b) => b.isOpen);
       const closed = board.filter((b) => !b.isOpen);
-      const band = this.getMemberBand(child);
 
       container.innerHTML =
         open.length === 0
@@ -2425,7 +2563,7 @@ function installRulesFeatures(AppClass) {
           : open
               .map((b) => {
                 const t = b.task;
-                const reward = Number(t.rewardByBand?.[band] || 0);
+                const reward = this.getTaskRewardCents(t);
                 const eligible = this.isTaskEligible(t, child);
                 const mine = b.assignments.find((a) => a.memberId === child.id);
                 const slotsText = b.slotsTotal === Infinity ? 'Para todos' : `Quedan ${b.slotsLeft} de ${b.slotsTotal}`;
@@ -2469,10 +2607,9 @@ function installRulesFeatures(AppClass) {
                       ${t.kind === 'EXTRA' ? (reward > 0 ? `+${formatMoneyCents(reward, currency)}` : '—') : 'Sin pago'}
                     </div>
                     <span class="inline-icon-text" style="font-size: 0.8rem; color: var(--text-secondary);">
-                      ${renderSvgIcon('calendar', 13)} Hasta el ${esc(t.dueDate)} · ${t.unit === 'WEEK' ? 'por semana' : 'una vez'}
+                      ${renderSvgIcon('calendar', 13)} ${t.dueDate ? `Hasta el ${esc(t.dueDate)}` : 'Abierta'} · ${t.unit === 'WEEK' ? 'por semana' : 'una vez'}
                     </span>
                   </div>
-                  ${t.kind === 'EXTRA' ? `<p style="margin: 0 0 0.5rem 0; font-size: 0.75rem; color: var(--text-muted);">Pago 9–12: ${formatMoneyCents(t.rewardByBand?.['9_12'] || 0, currency)} · 13–17: ${formatMoneyCents(t.rewardByBand?.['13_17'] || 0, currency)}</p>` : ''}
                   <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.65rem;">${chips}</div>
                   <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
                     ${childAction}
@@ -2502,7 +2639,7 @@ function installRulesFeatures(AppClass) {
                     <div class="tx-icon">${renderSvgIcon(t.iconKey || 'checklist', 20)}</div>
                     <div>
                       <p class="tx-title">${esc(t.title)}</p>
-                      <p class="tx-sub">Cerró el ${esc(t.dueDate)} · ${approved.length > 0 ? `La hicieron: ${names}` : 'Nadie la terminó'}</p>
+                      <p class="tx-sub">${t.dueDate ? `Cerró el ${esc(t.dueDate)}` : 'Cerrada'} · ${approved.length > 0 ? `La hicieron: ${names}` : 'Nadie la terminó'}</p>
                     </div>
                   </div>
                   <div class="tx-right" style="gap: 0.35rem; flex-wrap: wrap;">
@@ -2524,17 +2661,16 @@ function installRulesFeatures(AppClass) {
       const capEl = document.getElementById('fineCapInfoBox');
       if (!presetsEl || !finesEl) return;
 
-      const band = this.getMemberBand(child);
       const cfg = this.getRulesConfig();
 
       if (capEl) {
-        const fixedCap = Number(cfg.fineMonthlyCapByBand?.[band] || 0);
-        const minCap = Number(cfg.fineMinCapByBand?.[band] || 0);
+        const fixedCap = Number(cfg.fineMonthlyCapCents ?? cfg.fineMonthlyCapByBand?.['13_17'] ?? 15000);
+        const minCap = Number(cfg.fineMinCapCents ?? cfg.fineMinCapByBand?.['13_17'] ?? 1000);
         const pctCap = Math.floor((childFinance.income30Cents * Number(cfg.fineIncomePct || 25)) / 100);
         const cap = Math.min(fixedCap, Math.max(minCap, pctCap));
         capEl.innerHTML = `
           ${renderSvgIcon('shield-check', 18)}
-          <span><strong>Protección para ${esc(child.name)} (${BAND_LABEL[band]}):</strong>
+          <span><strong>Protección para ${esc(child.name)}:</strong>
           en 30 días las multas no pueden pasar de <strong>${formatMoneyCents(cap, currency)}</strong>
           (el menor entre ${formatMoneyCents(fixedCap, currency)} y el ${cfg.fineIncomePct}% de lo que recibió: ${formatMoneyCents(childFinance.income30Cents, currency)}).
           Ya usado: <strong>${formatMoneyCents(childFinance.fines30Cents, currency)}</strong>. Una multa nunca deja tu alcancía en negativo.</span>`;
@@ -2553,8 +2689,9 @@ function installRulesFeatures(AppClass) {
             </h4>
             <div class="tx-list">
               ${items
-                .map(
-                  (p) => `
+                .map((p) => {
+                  const amount = this.getPresetAmountCents(p);
+                  return `
                 <div class="tx-item">
                   <div class="tx-left">
                     <div class="tx-icon" style="color: ${meta.color};">${renderSvgIcon(p.iconKey || 'scale', 20)}</div>
@@ -2562,7 +2699,7 @@ function installRulesFeatures(AppClass) {
                       <p class="tx-title">${esc(p.title)}</p>
                       <p class="tx-sub">${esc(p.description || '')}</p>
                       <p class="tx-sub" style="font-family: var(--font-mono);">
-                        ${p.kind === 'REPAIR' ? 'Reparación: 50% del costo · tope ' : ''}9–12: ${formatMoneyCents(p.amountByBand?.['9_12'] || 0, currency)} · 13–17: ${formatMoneyCents(p.amountByBand?.['13_17'] || 0, currency)}
+                        ${p.kind === 'REPAIR' ? `Reparación: 50% del costo (tope ${formatMoneyCents(amount, currency)})` : `Multa: ${formatMoneyCents(amount, currency)}`}
                       </p>
                     </div>
                   </div>
@@ -2571,8 +2708,8 @@ function installRulesFeatures(AppClass) {
                     <button type="button" class="btn btn-ghost btn-sm" data-fine-preset-edit="${p.id}">${renderSvgIcon('edit', 14)} Editar</button>
                     <button type="button" class="btn btn-ghost btn-sm" data-fine-preset-delete="${p.id}" style="color: var(--color-expense);">${renderSvgIcon('trash', 14)} Borrar</button>
                   </div>
-                </div>`
-                )
+                </div>`;
+                })
                 .join('')}
             </div>
           </div>`;
@@ -2636,12 +2773,12 @@ function installRulesFeatures(AppClass) {
     renderInvestmentPlansPanel(child, currency) {
       const el = document.getElementById('investmentPlansContainer');
       if (!el) return;
-      const band = this.getMemberBand(child);
       const cfg = this.getRulesConfig();
-      const cap = Number(cfg.investCapByBand?.[band] || 0);
+      const cap = Number(cfg.investCapCents ?? cfg.investCapByBand?.['13_17'] ?? 250000);
       el.innerHTML = this.getInvestmentPlans()
         .map((p) => {
-          const bps = Number(p.yieldBpsByBand?.[band] || 0);
+          const bps = this.getPlanYieldBps(p);
+          const ratePct = (bps / 100).toFixed(2);
           const example = 10000;
           const exampleGain = Math.floor((example * bps) / 10000);
           const capGain = Math.floor((cap * bps) / 10000);
@@ -2651,10 +2788,13 @@ function installRulesFeatures(AppClass) {
               : 'Si lo sacas antes (después de 30 días): recuperas lo que pusiste + la mitad de lo ganado.';
           return `
           <div class="panel-card" style="margin-bottom: 0; background: var(--bg-elevated); border-top: 3px solid var(--color-invest);">
-            <h3 class="inline-icon-text" style="margin: 0 0 0.3rem 0; font-size: 1.05rem;">
-              <span style="color: var(--color-income); display: flex;">${renderSvgIcon(PLAN_ICONS[p.id] || 'trending-up', 22)}</span>
-              <span>${esc(p.label)}</span>
-            </h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+              <h3 class="inline-icon-text" style="margin: 0; font-size: 1.05rem;">
+                <span style="color: var(--color-income); display: flex;">${renderSvgIcon(PLAN_ICONS[p.id] || 'trending-up', 22)}</span>
+                <span>${esc(p.label)}</span>
+              </h3>
+              <span class="badge badge-success">+${ratePct}%</span>
+            </div>
             <p style="margin: 0 0 0.4rem 0; font-size: 0.82rem; color: var(--text-secondary);">${p.termDays} días · mínimo ${formatMoneyCents(p.minPrincipalCents, currency)}</p>
             <div style="font-size: 1.02rem; font-weight: 800; margin-bottom: 0.35rem;">
               Si guardas ${formatMoneyCents(example, currency)}, recibes <span style="color: var(--color-income);">${formatMoneyCents(example + exampleGain, currency)}</span>
@@ -2673,7 +2813,7 @@ function installRulesFeatures(AppClass) {
 
       const note = document.getElementById('investmentPlansNote');
       if (note) {
-        note.textContent = `Tasas para ${child.name} (${BAND_LABEL[band]}). Tope total guardado a plazo: ${formatMoneyCents(cap, currency)}. Las tasas las fijan Papá y Mamá; cada ahorro conserva la tasa del día en que se creó.`;
+        note.textContent = `Tasa igual para todos los hijos. Tope total guardado a plazo: ${formatMoneyCents(cap, currency)}. Las tasas las fijan Papá y Mamá; cada ahorro conserva la tasa del día en que se creó.`;
       }
     },
 
@@ -2691,7 +2831,7 @@ function installRulesFeatures(AppClass) {
               (kind) =>
                 `<optgroup label="${kind === 'EXTRA' ? 'Extras con pago' : 'Responsabilidades (sin pago)'}">` +
                 TASK_TEMPLATES.filter((t) => t.kind === kind)
-                  .map((t) => `<option value="${t.id}">${esc(t.title)}</option>`)
+                  .map((t) => `<option value="${t.id}">${esc(t.title)}${t.kind === 'EXTRA' ? ` (+${formatMoneyCents(t.rewardCents || 0)})` : ''}</option>`)
                   .join('') +
                 `</optgroup>`
             )
@@ -2702,7 +2842,7 @@ function installRulesFeatures(AppClass) {
             (c) => `
             <label class="inline-icon-text" style="font-size: 0.86rem; gap: 0.35rem;">
               <input type="checkbox" value="${c.id}" class="task-eligible-check" ${!task || !task.eligibleMemberIds?.length || task.eligibleMemberIds.includes(c.id) ? 'checked' : ''} />
-              ${esc(c.name)} (${c.age || 10})
+              ${esc(c.name)}
             </label>`
           )
           .join('');
@@ -2719,7 +2859,8 @@ function installRulesFeatures(AppClass) {
             description: '',
             iconKey: 'star',
             unit: 'ONCE',
-            rewardByBand: { '9_12': 2000, '13_17': 3000 },
+            rewardCents: 3500,
+            rewardByBand: { '9_12': 3500, '13_17': 3500 },
             maxAssignees: 1,
             dueDate: addDaysLocalDate(getTodayLocalDate(), 7)
           }
@@ -2734,20 +2875,29 @@ function installRulesFeatures(AppClass) {
       document.getElementById('taskDescInput').value = t.description || '';
       document.getElementById('taskIconSelect').value = TASK_ICON_KEYS.includes(t.iconKey) ? t.iconKey : 'star';
       document.getElementById('taskUnitSelect').value = t.unit || 'ONCE';
-      document.getElementById('taskReward912Input').value = ((t.rewardByBand?.['9_12'] || 0) / 100).toFixed(0);
-      document.getElementById('taskReward1317Input').value = ((t.rewardByBand?.['13_17'] || 0) / 100).toFixed(0);
+      const rewardDollars = (this.getTaskRewardCents(t) / 100).toFixed(0);
+      const rewardInput = document.getElementById('taskRewardInput');
+      if (rewardInput) rewardInput.value = rewardDollars;
+      const r912 = document.getElementById('taskReward912Input');
+      if (r912) r912.value = rewardDollars;
+      const r1317 = document.getElementById('taskReward1317Input');
+      if (r1317) r1317.value = rewardDollars;
       const slots = t.maxAssignees === null || t.maxAssignees === undefined ? 'ALL' : String(t.maxAssignees);
       document.getElementById('taskSlotsSelect').value = ['1', '2', '3', 'ALL'].includes(slots) ? slots : '1';
-      if (t.dueDate) document.getElementById('taskDueDateInput').value = t.dueDate;
+      document.getElementById('taskDueDateInput').value = t.dueDate || addDaysLocalDate(getTodayLocalDate(), 7);
       this.syncTaskKindUi();
     },
 
     syncTaskKindUi() {
       const isExtra = document.getElementById('taskKindSelect').value === 'EXTRA';
-      document.getElementById('taskRewardGroup912').style.display = isExtra ? '' : 'none';
-      document.getElementById('taskRewardGroup1317').style.display = isExtra ? '' : 'none';
+      const gSingle = document.getElementById('taskRewardGroup');
+      if (gSingle) gSingle.style.display = isExtra ? '' : 'none';
+      const g912 = document.getElementById('taskRewardGroup912');
+      if (g912) g912.style.display = isExtra ? '' : 'none';
+      const g1317 = document.getElementById('taskRewardGroup1317');
+      if (g1317) g1317.style.display = isExtra ? '' : 'none';
       document.getElementById('taskKindHint').textContent = isExtra
-        ? 'Extra con pago: algo adicional a las responsabilidades de casa.'
+        ? 'Extra con pago: el mismo pago parejo para quien la realice.'
         : 'Responsabilidad: parte de vivir en familia. Se registra y se aprueba, pero no se paga.';
     },
 
@@ -2756,8 +2906,8 @@ function installRulesFeatures(AppClass) {
         const editId = document.getElementById('taskEditIdInput').value.trim();
         const kind = document.getElementById('taskKindSelect').value;
         const title = document.getElementById('taskTitleInput').value.trim();
-        const r912 = kind === 'EXTRA' ? toCents(document.getElementById('taskReward912Input').value || 0) : 0;
-        const r1317 = kind === 'EXTRA' ? toCents(document.getElementById('taskReward1317Input').value || 0) : 0;
+        const rawReward = document.getElementById('taskRewardInput')?.value ?? document.getElementById('taskReward912Input')?.value ?? 0;
+        const rewardCents = kind === 'EXTRA' ? toCents(rawReward) : 0;
         const slotsVal = document.getElementById('taskSlotsSelect').value;
         const dueDate = document.getElementById('taskDueDateInput').value || addDaysLocalDate(getTodayLocalDate(), 7);
         const eligibleMemberIds = Array.from(document.querySelectorAll('.task-eligible-check'))
@@ -2768,12 +2918,9 @@ function installRulesFeatures(AppClass) {
           this.showToast('Escribe el nombre de la tarea.', 'warn');
           return;
         }
-        if (kind === 'EXTRA') {
-          const bad = [r912, r1317].some((v) => v !== 0 && (v < 100 || v > 50000));
-          if (bad || (r912 === 0 && r1317 === 0)) {
-            this.showToast('El pago de una tarea extra debe ser de $1 a $500 (pon $0 en una edad si no aplica).', 'warn');
-            return;
-          }
+        if (kind === 'EXTRA' && (rewardCents < 100 || rewardCents > 50000)) {
+          this.showToast('El pago de una tarea extra debe ser de $1 a $500.', 'warn');
+          return;
         }
         if (dueDate > addDaysLocalDate(getTodayLocalDate(), 90)) {
           this.showToast('La fecha límite debe ser dentro de los próximos 90 días.', 'warn');
@@ -2791,7 +2938,8 @@ function installRulesFeatures(AppClass) {
           description: document.getElementById('taskDescInput').value.trim(),
           iconKey: document.getElementById('taskIconSelect').value,
           unit: document.getElementById('taskUnitSelect').value,
-          rewardByBand: { '9_12': r912, '13_17': r1317 },
+          rewardCents,
+          rewardByBand: { '9_12': rewardCents, '13_17': rewardCents },
           maxAssignees: slotsVal === 'ALL' ? null : Number(slotsVal),
           eligibleMemberIds: eligibleMemberIds.length === allChildren.length ? [] : eligibleMemberIds,
           dueDate,
@@ -2872,8 +3020,9 @@ function installRulesFeatures(AppClass) {
     /** Calcula el pago (recalculado desde la tarea vigente, nunca desde el claim) y el estado del tope mensual. */
     computeTaskPayment(task, member) {
       const band = this.getMemberBand(member);
-      const amount = task.kind === 'EXTRA' ? Number(task.rewardByBand?.[band] || 0) : 0;
-      const cap = Number(this.getRulesConfig().taskMonthlyCapByBand?.[band] || 0);
+      const amount = this.getTaskRewardCents(task);
+      const cfg = this.getRulesConfig();
+      const cap = Number(cfg.taskMonthlyCapCents ?? cfg.taskMonthlyCapByBand?.[band] ?? 50000);
       const today = getTodayLocalDate();
       const windowStart = addDaysLocalDate(today, -30);
       const reversed = new Set(this.auditResult.validEvents.filter((e) => e.type === 'REVERSAL').map((e) => e.targetEventId));
@@ -3152,14 +3301,14 @@ function installRulesFeatures(AppClass) {
               `<optgroup label="${LEVEL_META[lvl].label}">` +
               presets
                 .filter((p) => p.level === lvl)
-                .map((p) => `<option value="${p.id}">${esc(p.title)}</option>`)
+                .map((p) => `<option value="${p.id}">${esc(p.title)} (${formatMoneyCents(this.getPresetAmountCents(p))})</option>`)
                 .join('') +
               `</optgroup>`
           )
           .join('');
         if (presetId) sel.value = presetId;
         document.getElementById('fineChildSelect').innerHTML = this.getChildren()
-          .map((c) => `<option value="${c.id}" ${c.id === this.selectedChildId ? 'selected' : ''}>${esc(c.name)} (${c.age || 10} años)</option>`)
+          .map((c) => `<option value="${c.id}" ${c.id === this.selectedChildId ? 'selected' : ''}>${esc(c.name)}</option>`)
           .join('');
         document.getElementById('fineReasonInput').value = '';
         document.getElementById('fineRepairCostInput').value = '';
@@ -3176,14 +3325,14 @@ function installRulesFeatures(AppClass) {
       const band = this.getMemberBand(member);
       const cfg = this.getRulesConfig();
       const confessed = document.getElementById('fineConfessedCheck').checked;
-      let nominal = Number(preset.amountByBand?.[band] || 0);
+      let nominal = this.getPresetAmountCents(preset);
       let repairCostCents = 0;
       if (preset.kind === 'REPAIR') {
         repairCostCents = toCents(document.getElementById('fineRepairCostInput').value || 0);
         nominal = Math.min(Math.floor(repairCostCents * 0.5), nominal);
       }
       if (confessed) nominal = Math.floor(nominal / 2);
-      const limits = FINE_LEVEL_LIMITS[preset.level]?.[band] || [0, 50000];
+      const limits = this.getFineLevelBounds(preset.level);
       nominal = Math.min(nominal, limits[1]);
       return {
         preset,
@@ -3198,8 +3347,8 @@ function installRulesFeatures(AppClass) {
           presetId: preset.id,
           iconKey: preset.iconKey || 'scale',
           ageBand: band,
-          monthlyCapCents: Number(cfg.fineMonthlyCapByBand?.[band] || 0),
-          minCapCents: Number(cfg.fineMinCapByBand?.[band] || 0),
+          monthlyCapCents: Number(cfg.fineMonthlyCapCents ?? cfg.fineMonthlyCapByBand?.[band] ?? 15000),
+          minCapCents: Number(cfg.fineMinCapCents ?? cfg.fineMinCapByBand?.[band] ?? 1000),
           incomePct: Number(cfg.fineIncomePct || 25),
           confessed,
           repairCostCents,
@@ -3384,8 +3533,13 @@ function installRulesFeatures(AppClass) {
         document.getElementById('fpKindSelect').value = p?.kind || 'FIXED';
         document.getElementById('fpTitleInput').value = p?.title || '';
         document.getElementById('fpDescInput').value = p?.description || '';
-        document.getElementById('fpAmount912Input').value = ((p?.amountByBand?.['9_12'] || 500) / 100).toFixed(0);
-        document.getElementById('fpAmount1317Input').value = ((p?.amountByBand?.['13_17'] || 1000) / 100).toFixed(0);
+        const amountDollars = ((this.getPresetAmountCents(p) || 1000) / 100).toFixed(0);
+        const fpAmount = document.getElementById('fpAmountInput');
+        if (fpAmount) fpAmount.value = amountDollars;
+        const fp912 = document.getElementById('fpAmount912Input');
+        if (fp912) fp912.value = amountDollars;
+        const fp1317 = document.getElementById('fpAmount1317Input');
+        if (fp1317) fp1317.value = amountDollars;
         document.getElementById('fpIconSelect').value = FINE_ICON_KEYS.includes(p?.iconKey) ? p.iconKey : 'scale';
         this.syncFinePresetHint();
         document.getElementById('dialogFinePreset')?.showModal();
@@ -3395,11 +3549,11 @@ function installRulesFeatures(AppClass) {
     syncFinePresetHint() {
       const level = document.getElementById('fpLevelSelect').value;
       const kind = document.getElementById('fpKindSelect').value;
-      const l = FINE_LEVEL_LIMITS[level];
+      const [minCents, maxCents] = this.getFineLevelBounds(level);
       document.getElementById('fpLimitsHint').textContent =
         kind === 'REPAIR'
-          ? `Reparación: se cobra el 50% del costo hasta el tope que pongas (máximo 9–12: ${formatMoneyCents(l['9_12'][1])}, 13–17: ${formatMoneyCents(l['13_17'][1])}).`
-          : `Rango permitido ${LEVEL_META[level].label}: 9–12 de ${formatMoneyCents(l['9_12'][0])} a ${formatMoneyCents(l['9_12'][1])} · 13–17 de ${formatMoneyCents(l['13_17'][0])} a ${formatMoneyCents(l['13_17'][1])}.`;
+          ? `Reparación: se cobra el 50% del costo hasta el tope que pongas (máximo ${formatMoneyCents(maxCents)}, igual para todos).`
+          : `Rango permitido ${LEVEL_META[level].label}: de ${formatMoneyCents(minCents)} a ${formatMoneyCents(maxCents)} (igual para todos).`;
     },
 
     async submitFinePresetForm() {
@@ -3408,18 +3562,16 @@ function installRulesFeatures(AppClass) {
         const level = document.getElementById('fpLevelSelect').value;
         const kind = document.getElementById('fpKindSelect').value;
         const title = document.getElementById('fpTitleInput').value.trim();
-        const a912 = toCents(document.getElementById('fpAmount912Input').value || 0);
-        const a1317 = toCents(document.getElementById('fpAmount1317Input').value || 0);
-        const l = FINE_LEVEL_LIMITS[level];
-        const minA = kind === 'REPAIR' ? 100 : null;
-        const ok912 = a912 >= (minA ?? l['9_12'][0]) && a912 <= l['9_12'][1];
-        const ok1317 = a1317 >= (minA ?? l['13_17'][0]) && a1317 <= l['13_17'][1];
+        const rawAmount = document.getElementById('fpAmountInput')?.value ?? document.getElementById('fpAmount912Input')?.value ?? 0;
+        const amountCents = toCents(rawAmount);
+        const [minCents, maxCents] = this.getFineLevelBounds(level);
+        const minAllowed = kind === 'REPAIR' ? 100 : minCents;
         if (!title) {
           this.showToast('Escribe el nombre de la regla.', 'warn');
           return;
         }
-        if (!ok912 || !ok1317) {
-          this.showToast('Los montos están fuera del rango permitido para ese nivel.', 'warn');
+        if (amountCents < minAllowed || amountCents > maxCents) {
+          this.showToast(`El monto debe estar entre ${formatMoneyCents(minAllowed)} y ${formatMoneyCents(maxCents)}.`, 'warn');
           return;
         }
         const data = {
@@ -3428,7 +3580,9 @@ function installRulesFeatures(AppClass) {
           title,
           description: document.getElementById('fpDescInput').value.trim(),
           iconKey: document.getElementById('fpIconSelect').value,
-          amountByBand: { '9_12': a912, '13_17': a1317 },
+          amountCents,
+          amountByBand: { '9_12': amountCents, '13_17': amountCents },
+          version: 2,
           active: true,
           updatedAt: new Date().toISOString()
         };
@@ -3457,62 +3611,79 @@ function installRulesFeatures(AppClass) {
     },
 
     /* ----------------------------------------------------------------------
-       PLANES DE AHORRO Y LÍMITES (Ajustes de Papá/Mamá)
+       PLANES DE AHORRO Y LÍMITES (Ajustes de Papá/Mamá - Sin distinción por edad)
        ---------------------------------------------------------------------- */
     openPlansDialog() {
       this.runAsParent(() => {
         const plans = this.getInvestmentPlans();
         const cfg = this.getRulesConfig();
         document.getElementById('plansEditorBody').innerHTML = plans
-          .map(
-            (p) => `
+          .map((p) => {
+            const bps = this.getPlanYieldBps(p);
+            return `
             <tr>
               <td><strong>${esc(p.label)}</strong><br/><span style="font-size: 0.75rem; color: var(--text-muted);">${p.termDays} días</span></td>
-              <td><input type="number" class="form-input" id="planRate_${p.id}_9_12" min="0" max="25" step="0.05" value="${(Number(p.yieldBpsByBand?.['9_12'] || 0) / 100).toFixed(2)}" /></td>
-              <td><input type="number" class="form-input" id="planRate_${p.id}_13_17" min="0" max="25" step="0.05" value="${(Number(p.yieldBpsByBand?.['13_17'] || 0) / 100).toFixed(2)}" /></td>
+              <td><input type="number" class="form-input" id="planRate_${p.id}" min="0" max="50" step="0.05" value="${(bps / 100).toFixed(2)}" /></td>
               <td><input type="number" class="form-input" id="planMin_${p.id}" min="1" step="1" value="${(Number(p.minPrincipalCents || 0) / 100).toFixed(0)}" /></td>
-            </tr>`
-          )
+            </tr>`;
+          })
           .join('');
         const setVal = (id, cents) => {
           const el = document.getElementById(id);
           if (el) el.value = (Number(cents || 0) / 100).toFixed(0);
         };
-        setVal('cfgInvestCap912', cfg.investCapByBand['9_12']);
-        setVal('cfgInvestCap1317', cfg.investCapByBand['13_17']);
-        setVal('cfgTaskCap912', cfg.taskMonthlyCapByBand['9_12']);
-        setVal('cfgTaskCap1317', cfg.taskMonthlyCapByBand['13_17']);
-        setVal('cfgFineCap912', cfg.fineMonthlyCapByBand['9_12']);
-        setVal('cfgFineCap1317', cfg.fineMonthlyCapByBand['13_17']);
+        const invCap = cfg.investCapCents ?? cfg.investCapByBand?.['13_17'] ?? 250000;
+        const taskCap = cfg.taskMonthlyCapCents ?? cfg.taskMonthlyCapByBand?.['13_17'] ?? 50000;
+        const fineCap = cfg.fineMonthlyCapCents ?? cfg.fineMonthlyCapByBand?.['13_17'] ?? 15000;
+        setVal('cfgInvestCap', invCap);
+        setVal('cfgTaskCap', taskCap);
+        setVal('cfgFineCap', fineCap);
+        setVal('cfgInvestCap912', invCap);
+        setVal('cfgInvestCap1317', invCap);
+        setVal('cfgTaskCap912', taskCap);
+        setVal('cfgTaskCap1317', taskCap);
+        setVal('cfgFineCap912', fineCap);
+        setVal('cfgFineCap1317', fineCap);
         this.updatePlansCostPreview();
         document.getElementById('dialogPlans')?.showModal();
       });
     },
 
     readPlansForm() {
-      const plans = this.getInvestmentPlans().map((p) => ({
-        ...p,
-        yieldBpsByBand: {
-          '9_12': Math.round(Number(document.getElementById(`planRate_${p.id}_9_12`)?.value || 0) * 100),
-          '13_17': Math.round(Number(document.getElementById(`planRate_${p.id}_13_17`)?.value || 0) * 100)
-        },
-        minPrincipalCents: toCents(document.getElementById(`planMin_${p.id}`)?.value || 0)
-      }));
+      const plans = this.getInvestmentPlans().map((p) => {
+        const rawRate = document.getElementById(`planRate_${p.id}`)?.value ?? document.getElementById(`planRate_${p.id}_13_17`)?.value ?? 0;
+        const bps = Math.round(Number(rawRate) * 100);
+        return {
+          ...p,
+          yieldBps: bps,
+          yieldBpsByBand: { '9_12': bps, '13_17': bps },
+          minPrincipalCents: toCents(document.getElementById(`planMin_${p.id}`)?.value || 0)
+        };
+      });
+      const invCap = toCents(document.getElementById('cfgInvestCap')?.value ?? document.getElementById('cfgInvestCap1317')?.value ?? 2500);
+      const taskCap = toCents(document.getElementById('cfgTaskCap')?.value ?? document.getElementById('cfgTaskCap1317')?.value ?? 500);
+      const fineCap = toCents(document.getElementById('cfgFineCap')?.value ?? document.getElementById('cfgFineCap1317')?.value ?? 150);
       const caps = {
-        investCapByBand: { '9_12': toCents(document.getElementById('cfgInvestCap912').value || 0), '13_17': toCents(document.getElementById('cfgInvestCap1317').value || 0) },
-        taskMonthlyCapByBand: { '9_12': toCents(document.getElementById('cfgTaskCap912').value || 0), '13_17': toCents(document.getElementById('cfgTaskCap1317').value || 0) },
-        fineMonthlyCapByBand: { '9_12': toCents(document.getElementById('cfgFineCap912').value || 0), '13_17': toCents(document.getElementById('cfgFineCap1317').value || 0) }
+        investCapCents: invCap,
+        investCapByBand: { '9_12': invCap, '13_17': invCap },
+        taskMonthlyCapCents: taskCap,
+        taskMonthlyCapByBand: { '9_12': taskCap, '13_17': taskCap },
+        fineMonthlyCapCents: fineCap,
+        fineMonthlyCapByBand: { '9_12': fineCap, '13_17': fineCap },
+        version: 2
       };
       return { plans, caps };
     },
 
     validatePlans(plans, caps) {
-      for (const band of ['9_12', '13_17']) {
-        const ann = plans.map((p) => annualizedPct(p.yieldBpsByBand[band], p.termDays));
-        if (ann.some((a) => a < 0 || a > 25)) return 'Ninguna tasa puede equivaler a más de 25% al año.';
-        const [s, m, l] = ann;
-        if (!(l >= m && m >= s)) return `Para ${BAND_LABEL[band]}: el plazo LARGO debe pagar igual o más que el MEDIANO, y el MEDIANO igual o más que el CORTO (comparando al año).`;
-        if (plans.some((p) => p.minPrincipalCents > caps.investCapByBand[band])) return 'El mínimo de un plan no puede ser mayor que el tope total guardado.';
+      const ann = plans.map((p) => annualizedPct(p.yieldBps, p.termDays));
+      if (ann.some((a) => a < 0 || a > 60)) return 'Ninguna tasa puede equivaler a más de 60% al año.';
+      const [s, m, l] = ann;
+      if (!(l >= m && m >= s)) {
+        return 'El plazo LARGO debe pagar igual o más que el MEDIANO, y el MEDIANO igual o más que el CORTO (comparando al año).';
+      }
+      if (plans.some((p) => p.minPrincipalCents > caps.investCapCents)) {
+        return 'El mínimo de un plan no puede ser mayor que el tope total guardado.';
       }
       return null;
     },
@@ -3522,13 +3693,16 @@ function installRulesFeatures(AppClass) {
       if (!box) return;
       const { plans, caps } = this.readPlansForm();
       const err = this.validatePlans(plans, caps);
-      const long = plans.find((p) => p.id === 'LONG');
-      const rows = ['9_12', '13_17'].map((band) => {
-        const ann = plans.map((p) => `${p.id === 'SHORT' ? 'Corto' : p.id === 'MEDIUM' ? 'Mediano' : 'Largo'} ≈ ${annualizedPct(p.yieldBpsByBand[band], p.termDays).toFixed(1)}%`).join(' · ');
-        const maxCost = Math.floor((caps.investCapByBand[band] * long.yieldBpsByBand[band]) / 10000);
-        return `<div><strong>${BAND_LABEL[band]}:</strong> equivalente al año: ${ann}. Costo máximo para ustedes: <strong>${formatMoneyCents(maxCost)}</strong> al año por hijo.</div>`;
-      });
-      box.innerHTML = `${rows.join('')}${err ? `<div style="color: var(--color-expense); margin-top: 0.35rem;"><strong>${esc(err)}</strong></div>` : ''}<div style="margin-top: 0.35rem; color: var(--text-muted);">Referencia: CETES a 28 días ≈ 6.5% anual. Los ahorros activos conservan su tasa original.</div>`;
+      const long = plans.find((p) => p.id === 'LONG') || { yieldBps: 2600 };
+      const ann = plans
+        .map((p) => `${p.id === 'SHORT' ? 'Corto (1 mes)' : p.id === 'MEDIUM' ? 'Mediano (6 meses)' : 'Largo (1 año)'}: +${(p.yieldBps / 100).toFixed(2)}% (≈ ${annualizedPct(p.yieldBps, p.termDays).toFixed(1)}% anual)`)
+        .join(' · ');
+      const maxCost = Math.floor((caps.investCapCents * long.yieldBps) / 10000);
+      box.innerHTML = `
+        <div><strong>Tasas parejas para todos:</strong> ${ann}.</div>
+        <div style="margin-top: 0.25rem;">Costo máximo para ustedes con el tope lleno: <strong>${formatMoneyCents(maxCost)}</strong> al año por hijo.</div>
+        ${err ? `<div style="color: var(--color-expense); margin-top: 0.35rem;"><strong>${esc(err)}</strong></div>` : ''}
+        <div style="margin-top: 0.35rem; color: var(--text-muted);">Los ahorros activos conservan la tasa del día en que fueron creados.</div>`;
     },
 
     async submitPlansForm() {
@@ -3543,18 +3717,19 @@ function installRulesFeatures(AppClass) {
         const prev = this.getInvestmentPlans();
         this.state.family.investmentPlans = plans.map((p) => {
           const old = prev.find((x) => x.id === p.id) || {};
-          const changed =
-            old.minPrincipalCents !== p.minPrincipalCents ||
-            old.yieldBpsByBand?.['9_12'] !== p.yieldBpsByBand['9_12'] ||
-            old.yieldBpsByBand?.['13_17'] !== p.yieldBpsByBand['13_17'];
-          return { ...p, version: changed ? Number(old.version || 1) + 1 : Number(old.version || 1), updatedAt: changed ? nowIso : old.updatedAt || nowIso };
+          const changed = old.minPrincipalCents !== p.minPrincipalCents || this.getPlanYieldBps(old) !== p.yieldBps;
+          return {
+            ...p,
+            version: Math.max(2, changed ? Number(old.version || 2) + 1 : Number(old.version || 2)),
+            updatedAt: changed ? nowIso : old.updatedAt || nowIso
+          };
         });
         this.state.family.rulesConfig = { ...this.getRulesConfig(), ...caps, updatedAt: nowIso };
         this.state.family.updatedAt = nowIso;
         document.getElementById('dialogPlans')?.close();
         await this.cloudManager.pushState(this.state);
         this.renderAll();
-        this.showToast('Tasas y límites guardados. Los ahorros activos conservan su tasa original.', 'success');
+        this.showToast('Tasas y límites guardados (parejos para todos los hijos).', 'success');
       });
     },
 
@@ -3565,7 +3740,8 @@ function installRulesFeatures(AppClass) {
       const plan = this.getPlan(planId);
       if (!plan) return { error: 'Elige un plan de ahorro.' };
       const band = this.getMemberBand(member);
-      const cap = Number(this.getRulesConfig().investCapByBand?.[band] || 0);
+      const cfg = this.getRulesConfig();
+      const cap = Number(cfg.investCapCents ?? cfg.investCapByBand?.[band] ?? 250000);
       if (principalCents < Number(plan.minPrincipalCents || 0)) {
         return { error: `El mínimo para ${plan.label} es ${formatMoneyCents(plan.minPrincipalCents)}.` };
       }
@@ -3574,7 +3750,7 @@ function installRulesFeatures(AppClass) {
       if (investedOther + principalCents > cap) {
         return { error: `Con esto pasarías el tope de ahorro a plazo (${formatMoneyCents(cap)}). Ya tienes ${formatMoneyCents(investedOther)} guardado.` };
       }
-      const bps = Number(plan.yieldBpsByBand?.[band] || 0);
+      const bps = this.getPlanYieldBps(plan);
       return { plan, band, bps, expectedYieldCents: Math.floor((principalCents * bps) / 10000), fin };
     },
 
@@ -3707,8 +3883,7 @@ function installRulesFeatures(AppClass) {
   Object.assign(AppClass.prototype, methods);
 }
 
-
-  /* === app.js === */
+/* === MODULE: app.js === */
 /**
  * SmartPiggy Cloud - Controlador Principal de la Aplicación (100% Iconografía SVG)
  * Integra:
@@ -3720,9 +3895,6 @@ function installRulesFeatures(AppClass) {
  * - Inversiones a plazo fijo con rendimiento garantizado y rescate anticipado.
  * - Sincronización en la nube multi-dispositivo (Zero-Config Cloud + Firebase RTDB + Supabase REST).
  */
-
-
-
 class SmartPiggyApp {
   constructor() {
     this.state = null;
@@ -3807,9 +3979,14 @@ class SmartPiggyApp {
   }
 
   initPwaInstallSupport() {
-    // 1. Registrar Service Worker para habilitar instalación PWA y funcionamiento offline
+    // 1. Registrar Service Worker para habilitar instalación PWA y actualizar caché inmediatamente
     if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker
+        .register('./sw.js?v=8')
+        .then((reg) => {
+          reg.update().catch(() => {});
+        })
+        .catch(() => {});
     }
 
     const btnInstall = document.getElementById('btnInstallPwa');
@@ -5120,14 +5297,26 @@ class SmartPiggyApp {
 
   updateSimulatorPreviews() {
     const currency = this.state?.family?.currency || 'MXN';
-    const child = this.getSelectedChild();
-    const band = this.getMemberBand(child);
+    const plans = this.getInvestmentPlans();
+    for (const selId of ['simInvPlan', 'invPlanSelect']) {
+      const sel = document.getElementById(selId);
+      if (sel) {
+        const currentVal = sel.value || 'SHORT';
+        sel.innerHTML = plans
+          .map((p) => {
+            const bps = this.getPlanYieldBps(p);
+            return `<option value="${p.id}" ${p.id === currentVal ? 'selected' : ''}>${p.label} (+${(bps / 100).toFixed(2)}%)</option>`;
+          })
+          .join('');
+        sel.value = currentVal;
+      }
+    }
 
     const invAmount = Number(document.getElementById('simInvAmount')?.value || 300);
     const planId = document.getElementById('simInvPlan')?.value || 'SHORT';
-    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBpsByBand: { '9_12': 100, '13_17': 75 }, minPrincipalCents: 5000 };
+    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBps: 200, yieldBpsByBand: { '9_12': 200, '13_17': 200 }, minPrincipalCents: 5000 };
     const invDays = Number(planObj.termDays || 30);
-    const invBps = Number(planObj.yieldBpsByBand?.[band] || 100);
+    const invBps = this.getPlanYieldBps(planObj) || 200;
     const invRate = (invBps / 100).toFixed(2);
     const amountLabel = document.getElementById('simInvAmountLabel');
     if (amountLabel) amountLabel.textContent = formatMoneyCents(invAmount * 100, currency);
@@ -5224,12 +5413,11 @@ class SmartPiggyApp {
     const currency = this.state?.family?.currency || 'MXN';
     const memberId = document.getElementById('invChildSelect')?.value || this.selectedChildId;
     const member = (this.state?.members || []).find((m) => m.id === memberId) || this.getSelectedChild();
-    const band = this.getMemberBand(member);
     const principal = toCents(document.getElementById('invPrincipalInput')?.value || 250);
     const planId = document.getElementById('invPlanSelect')?.value || 'SHORT';
-    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBpsByBand: { '9_12': 100, '13_17': 75 }, minPrincipalCents: 5000 };
+    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBps: 200, yieldBpsByBand: { '9_12': 200, '13_17': 200 }, minPrincipalCents: 5000 };
     const days = Number(planObj.termDays || 30);
-    const bps = Number(planObj.yieldBpsByBand?.[band] || 100);
+    const bps = this.getPlanYieldBps(planObj) || 200;
     const rate = (bps / 100).toFixed(2);
     const maturityDate = addDaysLocalDate(getTodayLocalDate(), days);
     const yieldCents = Math.floor((principal * bps) / 10000);
@@ -5393,18 +5581,18 @@ class SmartPiggyApp {
     });
 
     document.getElementById('btnOpenCloudDialog')?.addEventListener('click', () => {
-      this.switchTab('tab-cloud-security');
+      this.switchTab('tab-cloud-security', { scroll: true });
     });
 
     document.querySelectorAll('.nav-tab').forEach((tabBtn) => {
       tabBtn.addEventListener('click', () => {
         const target = tabBtn.getAttribute('data-tab');
-        this.switchTab(target);
+        this.switchTab(target, { scroll: false });
       });
     });
 
     document.getElementById('btnGoSandbox')?.addEventListener('click', () => {
-      this.switchTab('tab-sandbox');
+      this.switchTab('tab-sandbox', { scroll: true });
     });
 
     document.getElementById('filterTxType')?.addEventListener('change', (e) => {
@@ -5448,7 +5636,8 @@ class SmartPiggyApp {
 
       const switchTabBtn = e.target.closest('[data-switch-tab]');
       if (switchTabBtn) {
-        this.switchTab(switchTabBtn.getAttribute('data-switch-tab'));
+        const targetTab = switchTabBtn.getAttribute('data-switch-tab');
+        this.switchTab(targetTab, { scroll: true });
         return;
       }
 
@@ -5679,7 +5868,7 @@ class SmartPiggyApp {
     document.getElementById('btnPurgeCorruptedEntries')?.addEventListener('click', () => this.purgeCorruptedLedgerEntries());
   }
 
-  switchTab(tabId) {
+  switchTab(tabId, { scroll = false } = {}) {
     document.querySelectorAll('.nav-tab').forEach((btn) => {
       const active = btn.getAttribute('data-tab') === tabId;
       btn.classList.toggle('active', active);
@@ -5688,6 +5877,14 @@ class SmartPiggyApp {
     document.querySelectorAll('.tab-panel').forEach((panel) => {
       panel.classList.toggle('active', panel.id === tabId);
     });
+    if (this.auditResult && this.state) {
+      this.renderAll();
+    }
+    if (scroll) {
+      const targetPanel = document.getElementById(tabId);
+      const navTabs = document.querySelector('.nav-tabs');
+      (navTabs || targetPanel)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   openEditTransaction(txId) {
@@ -7278,5 +7475,4 @@ window.addEventListener('DOMContentLoaded', () => {
   const app = new SmartPiggyApp();
   app.init();
 });
-
 })();

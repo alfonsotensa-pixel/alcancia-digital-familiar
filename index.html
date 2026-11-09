@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body data-role="CHILD">
   <!-- Barra Superior de Nivel de Acceso (Lenguaje claro 9-17 años) -->
@@ -507,9 +507,9 @@
             <div class="form-group">
               <label class="form-label" for="simInvPlan">Elige el Plan de Ahorro (Tasa preestablecida por tus Papás)</label>
               <select id="simInvPlan" class="form-select">
-                <option value="SHORT" selected>Corto plazo — 1 mes (30 días)</option>
-                <option value="MEDIUM">Mediano plazo — 6 meses (182 días)</option>
-                <option value="LONG">Largo plazo — 1 año (365 días)</option>
+                <option value="SHORT" selected>Corto plazo (1 mes) (+2.00%)</option>
+                <option value="MEDIUM">Mediano plazo (6 meses) (+12.50%)</option>
+                <option value="LONG">Largo plazo (1 año) (+26.00%)</option>
               </select>
             </div>
 
@@ -1043,9 +1043,9 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
           <div class="form-group full">
             <label class="form-label" for="invPlanSelect">Plan de Ahorro a Plazo (Tasa preestablecida por Papá/Mamá)</label>
             <select id="invPlanSelect" class="form-select" required>
-              <option value="SHORT">Corto plazo — 1 mes (30 días)</option>
-              <option value="MEDIUM">Mediano plazo — 6 meses (182 días)</option>
-              <option value="LONG">Largo plazo — 1 año (365 días)</option>
+              <option value="SHORT">Corto plazo (1 mes) (+2.00%)</option>
+              <option value="MEDIUM">Mediano plazo (6 meses) (+12.50%)</option>
+              <option value="LONG">Largo plazo (1 año) (+26.00%)</option>
             </select>
           </div>
           <div class="form-group full">
@@ -1255,13 +1255,9 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
             <label class="form-label" for="taskDescInput">¿Qué debe quedar listo para aprobarse?</label>
             <input type="text" id="taskDescInput" class="form-input" placeholder="Ej. Carrocería, vidrios y llantas limpias" required />
           </div>
-          <div class="form-group" id="taskRewardGroup912">
-            <label class="form-label" for="taskReward912Input">Pago para 9 a 12 años ($)</label>
-            <input type="number" id="taskReward912Input" class="form-input" min="0" max="500" step="1" value="25" />
-          </div>
-          <div class="form-group" id="taskRewardGroup1317">
-            <label class="form-label" for="taskReward1317Input">Pago para 13 a 17 años ($)</label>
-            <input type="number" id="taskReward1317Input" class="form-input" min="0" max="500" step="1" value="40" />
+          <div class="form-group full" id="taskRewardGroup">
+            <label class="form-label" for="taskRewardInput">Pago por completar la tarea ($) — igual para todos</label>
+            <input type="number" id="taskRewardInput" class="form-input" min="0" max="500" step="1" value="35" />
           </div>
           <div class="form-group">
             <label class="form-label" for="taskSlotsSelect">¿Cuántos hijos pueden aceptarla?</label>
@@ -1279,7 +1275,7 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
               <option value="LOAD">Por carga completa</option>
               <option value="WEEK">Reto semanal</option>
               <option value="WEEKEND">Reto de fin de semana</option>
-              <option value="DAILY"> Hábito diario</option>
+              <option value="DAILY">Hábito diario</option>
             </select>
           </div>
           <div class="form-group">
@@ -1385,13 +1381,9 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
             <label class="form-label" for="fpDescInput">Descripción clara</label>
             <input type="text" id="fpDescInput" class="form-input" placeholder="Explica cuándo aplica esta regla" required />
           </div>
-          <div class="form-group">
-            <label class="form-label" for="fpAmount912Input">Monto / Tope 9 a 12 años ($)</label>
-            <input type="number" id="fpAmount912Input" class="form-input" min="1" max="300" step="1" value="10" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="fpAmount1317Input">Monto / Tope 13 a 17 años ($)</label>
-            <input type="number" id="fpAmount1317Input" class="form-input" min="1" max="500" step="1" value="15" required />
+          <div class="form-group full">
+            <label class="form-label" for="fpAmountInput">Monto o Tope de la multa ($) — igual para todos</label>
+            <input type="number" id="fpAmountInput" class="form-input" min="1" max="500" step="1" value="15" required />
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem;">
@@ -1416,15 +1408,14 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
       </div>
       <form id="formPlans">
         <p style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 0;">
-          Define el porcentaje total que gana el ahorro en cada plazo y los límites de protección familiar.
+          Define el porcentaje total que gana el ahorro en cada plazo y los límites de protección familiar (iguales para todos).
         </p>
         <div class="table-wrap" style="margin-bottom: 1rem;">
           <table class="data-table">
             <thead>
               <tr>
                 <th>Plan de Ahorro</th>
-                <th>Tasa total 9–12 (%)</th>
-                <th>Tasa total 13–17 (%)</th>
+                <th>Tasa total del plazo (%)</th>
                 <th>Mínimo ($)</th>
               </tr>
             </thead>
@@ -1433,28 +1424,16 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
         </div>
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label" for="cfgInvestCap912">Tope ahorrado a plazo 9–12 ($)</label>
-            <input type="number" id="cfgInvestCap912" class="form-input" min="100" step="50" value="1500" required />
+            <label class="form-label" for="cfgInvestCap">Tope ahorrado a plazo ($)</label>
+            <input type="number" id="cfgInvestCap" class="form-input" min="100" step="50" value="2500" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="cfgInvestCap1317">Tope ahorrado a plazo 13–17 ($)</label>
-            <input type="number" id="cfgInvestCap1317" class="form-input" min="100" step="50" value="3000" required />
+            <label class="form-label" for="cfgTaskCap">Tope mensual tareas extra ($)</label>
+            <input type="number" id="cfgTaskCap" class="form-input" min="50" step="20" value="500" required />
           </div>
-          <div class="form-group">
-            <label class="form-label" for="cfgTaskCap912">Tope mensual tareas extra 9–12 ($)</label>
-            <input type="number" id="cfgTaskCap912" class="form-input" min="50" step="20" value="320" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="cfgTaskCap1317">Tope mensual tareas extra 13–17 ($)</label>
-            <input type="number" id="cfgTaskCap1317" class="form-input" min="50" step="20" value="600" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="cfgFineCap912">Tope mensual multas 9–12 ($)</label>
-            <input type="number" id="cfgFineCap912" class="form-input" min="10" step="10" value="100" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="cfgFineCap1317">Tope mensual multas 13–17 ($)</label>
-            <input type="number" id="cfgFineCap1317" class="form-input" min="10" step="10" value="200" required />
+          <div class="form-group full">
+            <label class="form-label" for="cfgFineCap">Tope mensual multas ($)</label>
+            <input type="number" id="cfgFineCap" class="form-input" min="10" step="10" value="150" required />
           </div>
         </div>
         <div id="plansCostPreview" style="background: var(--bg-elevated); padding: 0.85rem; border-radius: var(--radius-sm); font-size: 0.82rem; margin-bottom: 1rem;"></div>
@@ -1481,6 +1460,6 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="js/smartpiggy-bundle.js"></script>
+  <script src="js/smartpiggy-bundle.js?v=8"></script>
 </body>
 </html>

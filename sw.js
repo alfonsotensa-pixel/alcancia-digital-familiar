@@ -2,13 +2,13 @@
  * SmartPiggy Cloud - Service Worker para Instalación PWA y Soporte Offline-First
  */
 
-const CACHE_NAME = 'smartpiggy-pwa-cache-v6';
+const CACHE_NAME = 'smartpiggy-pwa-cache-v8';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css',
+  './styles.css?v=8',
   './manifest.json',
-  './js/smartpiggy-bundle.js',
+  './js/smartpiggy-bundle.js?v=8',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon.svg'
@@ -46,9 +46,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Estrategia Network-First con respaldo en Caché Offline
+  // Estrategia Network-First con no-cache para evitar desfase entre HTML y bundle JS
+  const fetchOpts = url.origin === self.location.origin ? { cache: 'no-cache' } : {};
   event.respondWith(
-    fetch(req)
+    fetch(req, fetchOpts)
       .then((networkRes) => {
         if (networkRes && networkRes.status === 200 && url.origin === self.location.origin) {
           const clone = networkRes.clone();
@@ -56,6 +57,6 @@ self.addEventListener('fetch', (event) => {
         }
         return networkRes;
       })
-      .catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
+      .catch(() => caches.match(req, { ignoreSearch: true }).then((cached) => cached || caches.match('./index.html')))
   );
 });

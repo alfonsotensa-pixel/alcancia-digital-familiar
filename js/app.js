@@ -121,9 +121,14 @@ class SmartPiggyApp {
   }
 
   initPwaInstallSupport() {
-    // 1. Registrar Service Worker para habilitar instalación PWA y funcionamiento offline
+    // 1. Registrar Service Worker para habilitar instalación PWA y actualizar caché inmediatamente
     if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker
+        .register('./sw.js?v=8')
+        .then((reg) => {
+          reg.update().catch(() => {});
+        })
+        .catch(() => {});
     }
 
     const btnInstall = document.getElementById('btnInstallPwa');
@@ -1434,14 +1439,26 @@ class SmartPiggyApp {
 
   updateSimulatorPreviews() {
     const currency = this.state?.family?.currency || 'MXN';
-    const child = this.getSelectedChild();
-    const band = this.getMemberBand(child);
+    const plans = this.getInvestmentPlans();
+    for (const selId of ['simInvPlan', 'invPlanSelect']) {
+      const sel = document.getElementById(selId);
+      if (sel) {
+        const currentVal = sel.value || 'SHORT';
+        sel.innerHTML = plans
+          .map((p) => {
+            const bps = this.getPlanYieldBps(p);
+            return `<option value="${p.id}" ${p.id === currentVal ? 'selected' : ''}>${p.label} (+${(bps / 100).toFixed(2)}%)</option>`;
+          })
+          .join('');
+        sel.value = currentVal;
+      }
+    }
 
     const invAmount = Number(document.getElementById('simInvAmount')?.value || 300);
     const planId = document.getElementById('simInvPlan')?.value || 'SHORT';
-    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBpsByBand: { '9_12': 100, '13_17': 75 }, minPrincipalCents: 5000 };
+    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBps: 200, yieldBpsByBand: { '9_12': 200, '13_17': 200 }, minPrincipalCents: 5000 };
     const invDays = Number(planObj.termDays || 30);
-    const invBps = Number(planObj.yieldBpsByBand?.[band] || 100);
+    const invBps = this.getPlanYieldBps(planObj) || 200;
     const invRate = (invBps / 100).toFixed(2);
     const amountLabel = document.getElementById('simInvAmountLabel');
     if (amountLabel) amountLabel.textContent = formatMoneyCents(invAmount * 100, currency);
@@ -1538,12 +1555,11 @@ class SmartPiggyApp {
     const currency = this.state?.family?.currency || 'MXN';
     const memberId = document.getElementById('invChildSelect')?.value || this.selectedChildId;
     const member = (this.state?.members || []).find((m) => m.id === memberId) || this.getSelectedChild();
-    const band = this.getMemberBand(member);
     const principal = toCents(document.getElementById('invPrincipalInput')?.value || 250);
     const planId = document.getElementById('invPlanSelect')?.value || 'SHORT';
-    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBpsByBand: { '9_12': 100, '13_17': 75 }, minPrincipalCents: 5000 };
+    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBps: 200, yieldBpsByBand: { '9_12': 200, '13_17': 200 }, minPrincipalCents: 5000 };
     const days = Number(planObj.termDays || 30);
-    const bps = Number(planObj.yieldBpsByBand?.[band] || 100);
+    const bps = this.getPlanYieldBps(planObj) || 200;
     const rate = (bps / 100).toFixed(2);
     const maturityDate = addDaysLocalDate(getTodayLocalDate(), days);
     const yieldCents = Math.floor((principal * bps) / 10000);
@@ -1707,18 +1723,18 @@ class SmartPiggyApp {
     });
 
     document.getElementById('btnOpenCloudDialog')?.addEventListener('click', () => {
-      this.switchTab('tab-cloud-security');
+      this.switchTab('tab-cloud-security', { scroll: true });
     });
 
     document.querySelectorAll('.nav-tab').forEach((tabBtn) => {
       tabBtn.addEventListener('click', () => {
         const target = tabBtn.getAttribute('data-tab');
-        this.switchTab(target);
+        this.switchTab(target, { scroll: false });
       });
     });
 
     document.getElementById('btnGoSandbox')?.addEventListener('click', () => {
-      this.switchTab('tab-sandbox');
+      this.switchTab('tab-sandbox', { scroll: true });
     });
 
     document.getElementById('filterTxType')?.addEventListener('change', (e) => {
@@ -1762,7 +1778,8 @@ class SmartPiggyApp {
 
       const switchTabBtn = e.target.closest('[data-switch-tab]');
       if (switchTabBtn) {
-        this.switchTab(switchTabBtn.getAttribute('data-switch-tab'));
+        const targetTab = switchTabBtn.getAttribute('data-switch-tab');
+        this.switchTab(targetTab, { scroll: true });
         return;
       }
 
@@ -1993,7 +2010,7 @@ class SmartPiggyApp {
     document.getElementById('btnPurgeCorruptedEntries')?.addEventListener('click', () => this.purgeCorruptedLedgerEntries());
   }
 
-  switchTab(tabId) {
+  switchTab(tabId, { scroll = false } = {}) {
     document.querySelectorAll('.nav-tab').forEach((btn) => {
       const active = btn.getAttribute('data-tab') === tabId;
       btn.classList.toggle('active', active);
@@ -2002,6 +2019,14 @@ class SmartPiggyApp {
     document.querySelectorAll('.tab-panel').forEach((panel) => {
       panel.classList.toggle('active', panel.id === tabId);
     });
+    if (this.auditResult && this.state) {
+      this.renderAll();
+    }
+    if (scroll) {
+      const targetPanel = document.getElementById(tabId);
+      const navTabs = document.querySelector('.nav-tabs');
+      (navTabs || targetPanel)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   openEditTransaction(txId) {
