@@ -2,7 +2,7 @@
  * SmartPiggy Cloud - Service Worker para Instalación PWA y Soporte Offline-First
  */
 
-const CACHE_NAME = 'smartpiggy-pwa-cache-v5';
+const CACHE_NAME = 'smartpiggy-pwa-cache-v6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

@@ -291,13 +291,50 @@ export function recalculateLoanAfterExtraPrincipal(loan, extraPrincipalCents, pa
 }
 
 /**
+ * Banda de edad usada por tareas, multas y planes de ahorro.
+ */
+export function getAgeBand(age) {
+  return Number(age || 10) <= 12 ? '9_12' : '13_17';
+}
+
+/**
+ * Devuelve la inversión con los parámetros tomados del asiento FIRMADO de apertura (`INVESTMENT_LOCK` v2),
+ * para que la ganancia nunca dependa de datos sin firma (Ajuste B de la revisión).
+ */
+export function resolveSignedInvestment(investment, events = []) {
+  if (!investment) return investment;
+  const lock = (events || []).find((e) => e.type === 'INVESTMENT_LOCK' && e.referenceId === investment.id);
+  if (lock && Number(lock.sigVersion || 1) >= 2 && lock.metadata && lock.metadata.yieldBps !== undefined) {
+    const termDays = Math.max(1, Math.round(Number(lock.metadata.termDays || investment.termDays || 30)));
+    const startDate = lock.localDate || investment.startDate;
+    return {
+      ...investment,
+      principalCents: Math.round(Number(lock.amountCents || 0)),
+      planId: lock.metadata.planId || investment.planId || null,
+      planVersion: lock.metadata.planVersion || investment.planVersion || 1,
+      ageBand: lock.metadata.ageBand || investment.ageBand,
+      yieldBpsSnapshot: Math.round(Number(lock.metadata.yieldBps || 0)),
+      termDays,
+      startDate,
+      maturityDate: addDaysLocalDate(startDate, termDays)
+    };
+  }
+  return investment;
+}
+
+/**
  * Calcula los indicadores de una Inversión a Plazo Fijo (rendimiento garantizado, progreso y devengo al día).
+ * - Planes nuevos (CORTO/MEDIANO/LARGO): ganancia = floor(capital × yieldBps / 10000), interés simple del plazo.
+ * - Inversiones anteriores (legado, planId = null): ganancia = capital × yieldRatePercent / 100.
  */
 export function evaluateInvestmentProgress(investment, referenceLocalDate = getTodayLocalDate()) {
   const P = Math.round(Number(investment.principalCents || 0));
-  const ratePct = Number(investment.yieldRatePercent || 0);
+  const usesPlan = Boolean(investment.planId) && investment.yieldBpsSnapshot !== undefined && investment.yieldBpsSnapshot !== null;
+  const ratePct = usesPlan ? Number(investment.yieldBpsSnapshot) / 100 : Number(investment.yieldRatePercent || 0);
   const termDays = Math.max(1, Math.round(Number(investment.termDays || 30)));
-  const expectedInterestCents = Math.round(P * (ratePct / 100));
+  const expectedInterestCents = usesPlan
+    ? Math.floor((P * Number(investment.yieldBpsSnapshot)) / 10000)
+    : Math.round(P * (ratePct / 100));
   const maturityTotalCents = P + expectedInterestCents;
 
   const elapsedDaysRaw = diffDaysLocalDate(investment.startDate, referenceLocalDate);
@@ -309,18 +346,28 @@ export function evaluateInvestmentProgress(investment, referenceLocalDate = getT
       ? 0
       : investment.status === 'MATURED'
         ? expectedInterestCents
-        : Math.round(expectedInterestCents * progressRatio);
+        : Math.floor(expectedInterestCents * progressRatio);
 
   const isMatureReady = investment.status === 'ACTIVE' && referenceLocalDate >= investment.maturityDate;
 
+  // Retiro anticipado: CORTO (o legado) solo devuelve el capital; MEDIANO/LARGO desde el día 30
+  // devuelven capital + 50% de la ganancia acumulada. El capital nunca se pierde.
+  const halfAccruedPolicy = usesPlan && (investment.planId === 'MEDIUM' || investment.planId === 'LONG');
+  const earlyExitYieldCents =
+    halfAccruedPolicy && elapsedDays >= 30 ? Math.floor(expectedInterestCents * (elapsedDays / termDays) * 0.5) : 0;
+
   return {
     ...investment,
+    yieldRatePercent: usesPlan ? ratePct : investment.yieldRatePercent,
     expectedInterestCents,
     maturityTotalCents,
     elapsedDays,
     remainingDays,
     progressPercent: Math.round(progressRatio * 100),
     accruedInterestTodayCents,
+    dailyYieldCents: expectedInterestCents / termDays,
+    earlyExitYieldCents,
+    earlyExitPayoutCents: P + earlyExitYieldCents,
     isMatureReady
   };
 }
@@ -338,14 +385,20 @@ export function reduceMemberFinancialState({
   catalogs = [],
   referenceLocalDate = getTodayLocalDate()
 }) {
-  // 1. Identificar eventos anulados por contra-asiento (`REVERSAL`)
+  // 1. Identificar eventos anulados por contra-asiento (`REVERSAL`) total o parcial
   const reversedEventIds = new Set();
   const reversalMap = new Map();
+  const partialRefunds = new Map(); // targetEventId -> centavos devueltos (solo multas, REVERSAL v2 con metadata.partial)
 
   const memberEvents = validEvents.filter((ev) => ev.memberId === memberId);
   for (const ev of memberEvents) {
     if (ev.type === 'REVERSAL' && ev.targetEventId) {
-      reversedEventIds.add(ev.targetEventId);
+      const isPartial = Number(ev.sigVersion || 1) >= 2 && ev.metadata?.partial === true;
+      if (isPartial) {
+        partialRefunds.set(ev.targetEventId, (partialRefunds.get(ev.targetEventId) || 0) + Math.round(Number(ev.amountCents || 0)));
+      } else {
+        reversedEventIds.add(ev.targetEventId);
+      }
       reversalMap.set(ev.targetEventId, ev);
     }
   }
@@ -368,10 +421,20 @@ export function reduceMemberFinancialState({
   const incomeBySource = {};
   const expenseByCategory = {};
   const enrichedTimeline = [];
+  let totalFinesCents = 0;
+  let totalTaskRewardsCents = 0;
+  const incomeLog = []; // { date, cents } ingresos que cuentan para el tope de multas (mesada, depósitos, tareas, ganancias)
+  const fineLog = []; // { date, cents } multas cobradas realmente
+
+  const sumWindow = (log, endDate) => {
+    const startExclusive = addDaysLocalDate(endDate, -30);
+    return log.reduce((s, x) => (x.date > startExclusive && x.date <= endDate ? s + x.cents : s), 0);
+  };
 
   for (const ev of orderedEvents) {
     const isReversed = reversedEventIds.has(ev.id);
     const amount = Math.round(Number(ev.amountCents || 0));
+    let extra = {};
 
     if (!isReversed && ev.type !== 'REVERSAL') {
       switch (ev.type) {
@@ -381,6 +444,46 @@ export function reduceMemberFinancialState({
           totalIncomeCents += amount;
           const catKey = ev.catalogId || 'uncategorized_income';
           incomeBySource[catKey] = (incomeBySource[catKey] || 0) + amount;
+          incomeLog.push({ date: ev.localDate, cents: amount });
+          break;
+        }
+        case 'TASK_REWARD': {
+          availableCents += amount;
+          totalIncomeCents += amount;
+          totalTaskRewardsCents += amount;
+          const catKey = ev.catalogId || 'cat_inc_chores';
+          incomeBySource[catKey] = (incomeBySource[catKey] || 0) + amount;
+          incomeLog.push({ date: ev.localDate, cents: amount });
+          break;
+        }
+        case 'FINE': {
+          // El cargo real se calcula al reproducir el libro: nunca deja saldo negativo ni genera deuda.
+          // Todos los parámetros (tope fijo, mínimo, % de ingresos) vienen firmados dentro del evento (sigVersion 2).
+          const meta = Number(ev.sigVersion || 1) >= 2 ? ev.metadata || {} : {};
+          const fixedCap = meta.monthlyCapCents !== undefined ? Number(meta.monthlyCapCents) : Infinity;
+          const minCap = Number(meta.minCapCents || 0);
+          const pct = meta.incomePct !== undefined ? Number(meta.incomePct) : 100;
+          const income30 = sumWindow(incomeLog, ev.localDate);
+          const charged30 = sumWindow(fineLog, ev.localDate);
+          const monthlyCap = Math.min(fixedCap, Math.max(minCap, Math.floor((income30 * pct) / 100)));
+          const capRemaining = Math.max(0, monthlyCap - charged30);
+          const grossCharge = Math.max(0, Math.min(amount, Math.max(0, availableCents), capRemaining));
+          const refundedCents = Math.min(grossCharge, partialRefunds.get(ev.id) || 0);
+          const chargedCents = grossCharge - refundedCents;
+          availableCents -= chargedCents;
+          totalFinesCents += chargedCents;
+          fineLog.push({ date: ev.localDate, cents: chargedCents });
+          if (chargedCents > 0) {
+            const catKey = ev.catalogId || 'cat_exp_fines';
+            expenseByCategory[catKey] = (expenseByCategory[catKey] || 0) + chargedCents;
+          }
+          extra = {
+            chargedCents,
+            refundedCents,
+            forgivenCents: Math.max(0, amount - grossCharge),
+            monthlyCapCents: monthlyCap,
+            capRemainingCents: capRemaining
+          };
           break;
         }
         case 'EXPENSE': {
@@ -421,11 +524,20 @@ export function reduceMemberFinancialState({
           totalIncomeCents += yieldCents;
           const catKey = ev.catalogId || 'cat_inc_yield';
           incomeBySource[catKey] = (incomeBySource[catKey] || 0) + yieldCents;
+          incomeLog.push({ date: ev.localDate, cents: yieldCents });
           break;
         }
         case 'INVESTMENT_EARLY_EXIT': {
-          // Devuelve únicamente el capital bloqueado sin rendimiento
+          // Devuelve el capital (+ 50% de lo ganado si es plan MEDIANO/LARGO con 30 días o más)
           availableCents += amount;
+          const yieldCents = Number(ev.sigVersion || 1) >= 2 ? Math.round(Number(ev.metadata?.yieldCents || 0)) : 0;
+          if (yieldCents > 0) {
+            totalYieldEarnedCents += yieldCents;
+            totalIncomeCents += yieldCents;
+            const catKey = ev.catalogId || 'cat_inc_yield';
+            incomeBySource[catKey] = (incomeBySource[catKey] || 0) + yieldCents;
+            incomeLog.push({ date: ev.localDate, cents: yieldCents });
+          }
           break;
         }
         default:
@@ -435,16 +547,17 @@ export function reduceMemberFinancialState({
 
     enrichedTimeline.push({
       ...ev,
+      ...extra,
       isReversed,
       reversedByEvent: reversalMap.get(ev.id) || null,
       runningAvailableCents: availableCents
     });
   }
 
-  // 3. Calcular estado de Inversiones Activas y Rendimiento Devengado
+  // 3. Calcular estado de Inversiones Activas y Rendimiento Devengado (con parámetros firmados)
   const memberInvestments = investments
     .filter((inv) => inv.memberId === memberId)
-    .map((inv) => evaluateInvestmentProgress(inv, referenceLocalDate));
+    .map((inv) => evaluateInvestmentProgress(resolveSignedInvestment(inv, validEvents), referenceLocalDate));
 
   const activeInvestments = memberInvestments.filter((inv) => inv.status === 'ACTIVE');
   const investedCents = activeInvestments.reduce((sum, inv) => sum + inv.principalCents, 0);
@@ -494,6 +607,10 @@ export function reduceMemberFinancialState({
     totalExpenseCents,
     totalYieldEarnedCents,
     totalInterestPaidCents,
+    totalFinesCents,
+    totalTaskRewardsCents,
+    income30Cents: sumWindow(incomeLog, referenceLocalDate),
+    fines30Cents: sumWindow(fineLog, referenceLocalDate),
     incomeBySource,
     expenseByCategory,
     timeline: enrichedTimeline.slice().reverse(), // más reciente primero para la UI
@@ -540,11 +657,12 @@ export function findDueDeterministicAutomations(appState, referenceLocalDate = g
     }
   }
 
-  for (const inv of appState.investments || []) {
-    if (inv.status !== 'ACTIVE') continue;
+  for (const rawInv of appState.investments || []) {
+    if (rawInv.status !== 'ACTIVE') continue;
+    const inv = resolveSignedInvestment(rawInv, appState.ledgerEvents || []);
     if (inv.maturityDate <= referenceLocalDate) {
       const deterministicTxId = `det_inv_mat_${inv.id}`;
-      if (!existingEventIds.has(deterministicTxId)) {
+      if (!existingEventIds.has(deterministicTxId) && !existingEventIds.has(`det_inv_exit_${inv.id}`)) {
         const evalInv = evaluateInvestmentProgress(inv, referenceLocalDate);
         dueInvestments.push({
           deterministicTxId,
@@ -565,4 +683,88 @@ export function findDueDeterministicAutomations(appState, referenceLocalDate = g
     dueInvestments,
     totalDueCount: dueRecurring.length + dueInvestments.length
   };
+}
+
+/**
+ * Tablero de Tareas y Retos (función pura, sin escrituras).
+ * Deriva el estado de cada hijo en cada tarea a partir de:
+ * - taskClaims (sin firma, los crea el hijo): { id, taskId, memberId, stage: ACCEPTED|SUBMITTED|WITHDRAWN, attempt, createdAt }
+ * - taskReviews (los crea el papá con PIN): { taskId, memberId, attempt, decision: APPROVED|REJECTED }
+ * - ledgerEvents TASK_REWARD firmados (id determinista det_task_{taskId}_{memberId}).
+ * Reglas: cupos por orden de llegada (createdAt, memberId); una asignación entregada/revisada/pagada queda
+ * "congelada" aunque después sincronice un claim más antiguo (Ajuste A). Máximo 2 intentos.
+ */
+export function deriveTaskBoard({ tasks = [], taskClaims = [], taskReviews = [], validEvents = [], referenceLocalDate = getTodayLocalDate() }) {
+  const reversed = new Set(
+    validEvents.filter((e) => e.type === 'REVERSAL' && !(Number(e.sigVersion || 1) >= 2 && e.metadata?.partial)).map((e) => e.targetEventId)
+  );
+  const rewardById = new Map(
+    validEvents.filter((e) => e.type === 'TASK_REWARD' && !reversed.has(e.id)).map((e) => [e.id, e])
+  );
+
+  const board = [];
+  for (const task of tasks) {
+    const claims = taskClaims
+      .filter((c) => c.taskId === task.id)
+      .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || String(a.memberId).localeCompare(String(b.memberId)));
+    const reviewsFor = (memberId) =>
+      taskReviews.filter((r) => r.taskId === task.id && r.memberId === memberId).sort((a, b) => Number(a.attempt) - Number(b.attempt));
+
+    const enriched = claims.map((claim) => {
+      const reviews = reviewsFor(claim.memberId);
+      const rewardEvent = rewardById.get(`det_task_${task.id}_${claim.memberId}`) || null;
+      const approvedReview = reviews.find((r) => r.decision === 'APPROVED') || null;
+      const rejections = reviews.filter((r) => r.decision === 'REJECTED');
+      const attempt = Math.max(1, Number(claim.attempt || 1));
+      const currentRejected = rejections.some((r) => Number(r.attempt) === attempt);
+      const frozen = claim.stage === 'SUBMITTED' || reviews.length > 0 || Boolean(rewardEvent);
+      return { claim, reviews, rewardEvent, approvedReview, rejections, attempt, currentRejected, frozen };
+    });
+
+    const active = enriched.filter((x) => x.claim.stage !== 'WITHDRAWN');
+    const unlimited = task.maxAssignees === null || task.maxAssignees === undefined || Number(task.maxAssignees) <= 0;
+    const slots = unlimited ? Infinity : Number(task.maxAssignees);
+    const winners = new Set();
+    active.filter((x) => x.frozen).forEach((x) => winners.add(x.claim.id));
+    for (const x of active) {
+      if (winners.size >= slots) break;
+      if (!winners.has(x.claim.id) && String(x.claim.createdAt || '').slice(0, 10) <= String(task.dueDate || '9999-12-31')) {
+        winners.add(x.claim.id);
+      }
+    }
+
+    const assignments = enriched.map((x) => {
+      let status;
+      if (x.rewardEvent || x.approvedReview) status = 'APPROVED';
+      else if (x.claim.stage === 'WITHDRAWN') status = 'WITHDRAWN';
+      else if (!winners.has(x.claim.id)) status = 'BUMPED';
+      else if (x.rejections.length >= 2) status = 'REJECTED';
+      else if (x.claim.stage === 'SUBMITTED' && !x.currentRejected) status = 'SUBMITTED';
+      else if (referenceLocalDate > String(task.dueDate || '9999-12-31')) status = 'EXPIRED';
+      else status = x.currentRejected ? 'NEEDS_FIX' : 'ACCEPTED';
+      return {
+        claimId: x.claim.id,
+        taskId: task.id,
+        memberId: x.claim.memberId,
+        status,
+        attempt: x.attempt,
+        claimedAt: x.claim.createdAt,
+        submittedAt: x.claim.submittedAt || null,
+        submissionNote: x.claim.note || '',
+        lastReview: x.reviews[x.reviews.length - 1] || null,
+        rewardEvent: x.rewardEvent
+      };
+    });
+
+    const occupying = assignments.filter((a) => ['ACCEPTED', 'NEEDS_FIX', 'SUBMITTED', 'APPROVED'].includes(a.status)).length;
+    board.push({
+      task,
+      assignments,
+      slotsTotal: slots,
+      slotsUsed: occupying,
+      slotsLeft: unlimited ? Infinity : Math.max(0, slots - occupying),
+      isOpen: task.status !== 'CLOSED' && referenceLocalDate <= String(task.dueDate || '9999-12-31')
+    });
+  }
+  return board;
 }

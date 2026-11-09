@@ -28,11 +28,14 @@ import {
   recalculateLoanAfterExtraPrincipal,
   evaluateInvestmentProgress,
   reduceMemberFinancialState,
-  findDueDeterministicAutomations
+  findDueDeterministicAutomations,
+  resolveSignedInvestment,
+  getAgeBand
 } from './financial-engine.js';
 
 import { CloudSyncManager, mergeFamilyCRDT, stripLegacyDemoData } from './cloud-sync.js';
-import { buildInitialSignedFamilyState } from './seed-data.js';
+import { buildInitialSignedFamilyState, ensureFeatureDefaults } from './seed-data.js';
+import { installRulesFeatures } from './rules-features.js';
 
 class SmartPiggyApp {
   constructor() {
@@ -87,7 +90,7 @@ class SmartPiggyApp {
     if (!loaded || !loaded.family) {
       loaded = await buildInitialSignedFamilyState(this.cloudManager.familyCode);
     }
-    this.state = stripLegacyDemoData(loaded);
+    this.state = ensureFeatureDefaults(stripLegacyDemoData(loaded));
     this.cloudManager.saveLocalState(this.state);
 
     // Normalizar cualquier clave de icono previa al estándar SVG
@@ -103,6 +106,7 @@ class SmartPiggyApp {
     }
 
     this.bindEvents();
+    this.bindRulesEvents();
     this.initPwaInstallSupport();
     this.populateCloudConfigInputs();
     this.updateSimulatorPreviews();
@@ -230,7 +234,7 @@ class SmartPiggyApp {
   async handleRemoteStateMerged(remoteState, sourceLabel) {
     const prevEventCount = (this.state?.ledgerEvents || []).length;
     const prevReqCount = (this.state?.childRequests || []).length;
-    this.state = mergeFamilyCRDT(this.state, remoteState);
+    this.state = ensureFeatureDefaults(mergeFamilyCRDT(this.state, remoteState));
     this.normalizeLegacyIconsToSvg();
     await this.runLedgerAuditAndRender();
 
@@ -621,12 +625,16 @@ class SmartPiggyApp {
 
     // 7. Renderizar cada pestaña funcional
     this.renderMovementsAndCharts(childFinance, currency);
+    this.renderTasksSection(child, currency);
+    this.renderRulesSection(child, childFinance, currency);
+    this.renderInvestmentPlansPanel(child, currency);
     this.renderRecurringRules(child, currency);
     this.renderLoansSection(childFinance, currency);
     this.renderInvestmentsSection(childFinance, currency);
     this.renderUsersAndCatalogs(currency);
     this.renderChildRequests(currency);
     this.renderCryptoAuditPanel(currency);
+    this.updateSimulatorPreviews();
   }
 
   renderGoalBanner(child, childFinance, currency) {
@@ -707,26 +715,67 @@ class SmartPiggyApp {
       }
     }
 
+    const submittedTasks = [];
+    this.getTaskBoard().forEach((b) =>
+      b.assignments
+        .filter((a) => a.status === 'SUBMITTED')
+        .forEach((a) => submittedTasks.push({ b, a }))
+    );
+    if (submittedTasks.length > 0) {
+      const firstSub = submittedTasks[0];
+      const childMember = (this.state.members || []).find((m) => m.id === firstSub.a.memberId);
+      banners.push(`
+        <div class="notice-banner info">
+          <div class="inline-icon-text">
+            ${renderSvgIcon('checklist', 20)}
+            <span><strong>Tarea terminada por revisar (${submittedTasks.length}):</strong>
+            ${childMember ? childMember.name : 'Hijo/a'} entregó "${firstSub.b.task.title}"</span>
+          </div>
+          <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-income" data-task-approve="${firstSub.b.task.id}:${firstSub.a.memberId}">
+              ${renderSvgIcon('check', 15)} ${firstSub.b.task.kind === 'EXTRA' ? 'Aprobar y pagar' : 'Aprobar'}
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" data-switch-tab="tab-tasks">
+              Ver Tareas
+            </button>
+          </div>
+        </div>
+      `);
+    }
+
     const pendingReqs = (this.state.childRequests || []).filter((r) => r.status === 'PENDING');
     if (pendingReqs.length > 0) {
       const firstReq = pendingReqs[0];
+      const isAppeal = firstReq.requestType === 'FINE_APPEAL';
       banners.push(`
         <div class="notice-banner warning">
           <div class="inline-icon-text">
-            ${renderSvgIcon('inbox', 20)}
-            <span><strong>Pedido pendiente (${pendingReqs.length}):</strong>
+            ${renderSvgIcon(isAppeal ? 'hand-raise' : 'inbox', 20)}
+            <span><strong>${isAppeal ? 'Revisión de multa' : 'Pedido pendiente'} (${pendingReqs.length}):</strong>
             "${firstReq.title}"</span>
           </div>
           <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
-            <button type="button" class="btn btn-sm btn-income" data-approve-request="${firstReq.id}">
-              ${renderSvgIcon('check', 15)} Aprobar Pedido Ahora
-            </button>
-            <button type="button" class="btn btn-sm btn-ghost" data-reject-request="${firstReq.id}">
-              ${renderSvgIcon('x', 15)} Rechazar
-            </button>
-            <button type="button" class="btn btn-sm btn-ghost" data-switch-tab="tab-sandbox">
-              Ver en Calculadora
-            </button>
+            ${
+              isAppeal
+                ? `<button type="button" class="btn btn-sm btn-income" data-fine-resolve="${firstReq.refId}:REMOVE">
+                     ${renderSvgIcon('undo', 15)} Quitar multa
+                   </button>
+                   <button type="button" class="btn btn-sm btn-ghost" data-fine-resolve="${firstReq.refId}:HALF">
+                     Bajar a la mitad
+                   </button>
+                   <button type="button" class="btn btn-sm btn-ghost" data-switch-tab="tab-rules">
+                     Ver en Reglas
+                   </button>`
+                : `<button type="button" class="btn btn-sm btn-income" data-approve-request="${firstReq.id}">
+                     ${renderSvgIcon('check', 15)} Aprobar Pedido Ahora
+                   </button>
+                   <button type="button" class="btn btn-sm btn-ghost" data-reject-request="${firstReq.id}">
+                     ${renderSvgIcon('x', 15)} Rechazar
+                   </button>
+                   <button type="button" class="btn btn-sm btn-ghost" data-switch-tab="tab-sandbox">
+                     Ver en Calculadora
+                   </button>`
+            }
           </div>
         </div>
       `);
@@ -739,8 +788,10 @@ class SmartPiggyApp {
     const listEl = document.getElementById('transactionsListContainer');
     const filtered = childFinance.timeline.filter((ev) => {
       if (this.txFilter === 'ALL') return true;
-      if (this.txFilter === 'INCOME') return ev.type === 'INCOME' || ev.type === 'RECURRING_INCOME' || ev.type === 'INVESTMENT_MATURITY';
-      if (this.txFilter === 'EXPENSE') return ev.type === 'EXPENSE';
+      if (this.txFilter === 'INCOME') return ev.type === 'INCOME' || ev.type === 'RECURRING_INCOME' || ev.type === 'INVESTMENT_MATURITY' || ev.type === 'TASK_REWARD';
+      if (this.txFilter === 'EXPENSE') return ev.type === 'EXPENSE' || ev.type === 'FINE';
+      if (this.txFilter === 'TASK') return ev.type === 'TASK_REWARD';
+      if (this.txFilter === 'FINE') return ev.type === 'FINE';
       if (this.txFilter === 'LOAN') return ev.type === 'LOAN_DISBURSEMENT' || ev.type === 'LOAN_PAYMENT' || ev.type === 'EXTRA_PRINCIPAL_PAYMENT';
       if (this.txFilter === 'INVESTMENT') return ev.type === 'INVESTMENT_LOCK' || ev.type === 'INVESTMENT_MATURITY' || ev.type === 'INVESTMENT_EARLY_EXIT';
       return true;
@@ -757,17 +808,35 @@ class SmartPiggyApp {
           let prefix = '';
           let typeBadge = '';
           let fallbackIcon = 'list';
+          let displayAmountCents = ev.amountCents;
 
-          if (ev.type === 'INCOME' || ev.type === 'RECURRING_INCOME' || ev.type === 'INVESTMENT_MATURITY' || ev.type === 'INVESTMENT_EARLY_EXIT') {
+          if (ev.type === 'INCOME' || ev.type === 'RECURRING_INCOME' || ev.type === 'INVESTMENT_MATURITY' || ev.type === 'INVESTMENT_EARLY_EXIT' || ev.type === 'TASK_REWARD') {
             signClass = 'positive';
             prefix = '+';
-            fallbackIcon = 'coins';
-            typeBadge = ev.type === 'RECURRING_INCOME' ? 'Mesada' : ev.type === 'INVESTMENT_MATURITY' ? 'Ahorro Ganado' : 'Dinero que entró';
-          } else if (ev.type === 'EXPENSE' || ev.type === 'LOAN_PAYMENT' || ev.type === 'EXTRA_PRINCIPAL_PAYMENT') {
+            fallbackIcon = ev.type === 'TASK_REWARD' ? 'trophy' : 'coins';
+            typeBadge =
+              ev.type === 'RECURRING_INCOME'
+                ? 'Mesada'
+                : ev.type === 'INVESTMENT_MATURITY'
+                  ? 'Ahorro Ganado'
+                  : ev.type === 'TASK_REWARD'
+                    ? 'Tarea / Reto'
+                    : 'Dinero que entró';
+          } else if (ev.type === 'EXPENSE' || ev.type === 'FINE' || ev.type === 'LOAN_PAYMENT' || ev.type === 'EXTRA_PRINCIPAL_PAYMENT') {
             signClass = 'negative';
             prefix = '-';
-            fallbackIcon = 'shopping-bag';
-            typeBadge = ev.type === 'EXPENSE' ? 'Gasto' : ev.type === 'EXTRA_PRINCIPAL_PAYMENT' ? 'Pago adelantado' : 'Pago de préstamo';
+            fallbackIcon = ev.type === 'FINE' ? 'scale' : 'shopping-bag';
+            typeBadge =
+              ev.type === 'FINE'
+                ? 'Multa'
+                : ev.type === 'EXPENSE'
+                  ? 'Gasto'
+                  : ev.type === 'EXTRA_PRINCIPAL_PAYMENT'
+                    ? 'Pago adelantado'
+                    : 'Pago de préstamo';
+            if (ev.type === 'FINE') {
+              displayAmountCents = Number(ev.chargedCents ?? ev.amountCents);
+            }
           } else if (ev.type === 'INVESTMENT_LOCK') {
             signClass = 'neutral';
             prefix = '';
@@ -781,6 +850,10 @@ class SmartPiggyApp {
           }
 
           const iconSvg = renderSvgIcon(cat?.icon || fallbackIcon, 20);
+          const fineExtraNote =
+            ev.type === 'FINE' && (ev.forgivenCents > 0 || ev.refundedCents > 0)
+              ? `<span class="badge badge-success">Multa ${formatMoneyCents(ev.amountCents, currency)}${ev.forgivenCents > 0 ? ` · Perdonado ${formatMoneyCents(ev.forgivenCents, currency)}` : ''}${ev.refundedCents > 0 ? ` · Devuelto ${formatMoneyCents(ev.refundedCents, currency)}` : ''}</span>`
+              : '';
 
           return `
             <div class="tx-item ${ev.isReversed ? 'reversed' : ''}">
@@ -790,6 +863,7 @@ class SmartPiggyApp {
                   <p class="tx-title">
                     ${ev.note || cat?.name || typeBadge}
                     ${ev.isReversed ? `<span class="badge badge-danger">${renderSvgIcon('ban', 12)} CANCELADO</span>` : ''}
+                    ${fineExtraNote}
                   </p>
                   <p class="tx-sub inline-icon-text" style="flex-wrap: wrap;">
                     ${renderSvgIcon('calendar', 13)} <span>${ev.localDate}</span> ·
@@ -801,7 +875,7 @@ class SmartPiggyApp {
               <div class="tx-right" style="flex-wrap: wrap; justify-content: flex-end;">
                 <div>
                   <div class="tx-amount ${signClass}">
-                    ${prefix}${formatMoneyCents(ev.amountCents, currency)}
+                    ${prefix}${formatMoneyCents(displayAmountCents, currency)}
                   </div>
                   <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
                     Quedó: ${formatMoneyCents(ev.runningAvailableCents, currency)}
@@ -1075,9 +1149,11 @@ class SmartPiggyApp {
     const investments = childFinance.investments;
 
     if (investments.length === 0) {
-      container.innerHTML = `<p style="color: var(--text-muted);">Aún no tienes ahorros guardados a plazo.</p>`;
+      container.innerHTML = `<p style="color: var(--text-muted);">Aún no tienes ahorros guardados a plazo. Elige arriba un plan de Corto (1 mes), Mediano (6 meses) o Largo plazo (1 año).</p>`;
       return;
     }
+
+    const planNames = { SHORT: 'Corto plazo (1 mes)', MEDIUM: 'Mediano plazo (6 meses)', LONG: 'Largo plazo (1 año)' };
 
     container.innerHTML = investments
       .map((inv) => {
@@ -1085,13 +1161,18 @@ class SmartPiggyApp {
           inv.status === 'MATURED'
             ? `<span class="badge badge-success">${renderSvgIcon('check', 13)} ¡Terminado y Cobrado!</span>`
             : inv.status === 'CANCELLED_EARLY'
-              ? `<span class="badge badge-warn">${renderSvgIcon('stop', 13)} Sacado Antes (Sin premio)</span>`
+              ? `<span class="badge badge-warn">${renderSvgIcon('stop', 13)} Sacado Antes</span>`
               : `<span class="badge badge-info">${renderSvgIcon('lock', 13)} Creciendo (${inv.progressPercent}%)</span>`;
+
+        const planBadge = inv.planId && planNames[inv.planId] ? `<span class="badge badge-purple">${planNames[inv.planId]}</span>` : '';
+        const milestone = inv.progressPercent >= 100 ? '100%' : inv.progressPercent >= 75 ? '75%' : inv.progressPercent >= 50 ? '50%' : inv.progressPercent >= 25 ? '25%' : 'Inicio';
+        const showDaily = Number(inv.dailyYieldCents || 0) >= 10;
 
         return `
           <div class="panel-card" style="margin-bottom: 0; background: var(--bg-elevated);">
-            <div class="panel-header" style="margin-bottom: 0.5rem;">
+            <div class="panel-header" style="margin-bottom: 0.5rem; gap: 0.35rem; flex-wrap: wrap;">
               ${stBadge}
+              ${planBadge}
               <span class="badge badge-success">Ganas +${inv.yieldRatePercent}% en ${inv.termDays} días</span>
             </div>
             <h3 class="inline-icon-text" style="margin: 0 0 0.4rem 0; font-size: 1.06rem;">
@@ -1105,8 +1186,8 @@ class SmartPiggyApp {
                 <div style="font-family: var(--font-mono); font-size: 1.35rem; font-weight: 800;">${formatMoneyCents(inv.principalCents, currency)}</div>
               </div>
               <div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Ganado hasta hoy</div>
-                <div style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--color-income);">+${formatMoneyCents(inv.accruedInterestTodayCents, currency)}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">${showDaily ? 'Ganado hasta hoy' : `Ganancia al terminar (Hito: ${milestone})`}</div>
+                <div style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--color-income);">+${formatMoneyCents(showDaily ? inv.accruedInterestTodayCents : inv.expectedInterestCents, currency)}</div>
               </div>
               <div>
                 <div style="font-size: 0.75rem; color: var(--text-muted);">Recibirás al final</div>
@@ -1130,8 +1211,8 @@ class SmartPiggyApp {
                     <button type="button" class="btn btn-income btn-sm" data-mature-investment="${inv.id}" title="Entregar el dinero guardado más su ganancia completa a la alcancía">
                       ${renderSvgIcon('check', 14)} Entregar + Ganancia (+${formatMoneyCents(inv.expectedInterestCents, currency)})
                     </button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-early-exit-investment="${inv.id}" title="Sacar el dinero antes de tiempo sin ganancia extra">
-                      ${renderSvgIcon('stop', 14)} Sacar Antes
+                    <button type="button" class="btn btn-ghost btn-sm" data-early-exit-investment="${inv.id}" title="Sacar el dinero antes de tiempo">
+                      ${renderSvgIcon('stop', 14)} Sacar Antes (${inv.earlyExitYieldCents > 0 ? `+${formatMoneyCents(inv.earlyExitYieldCents, currency)}` : 'Solo capital'})
                     </button>
                   `
                   : ''
@@ -1353,34 +1434,49 @@ class SmartPiggyApp {
 
   updateSimulatorPreviews() {
     const currency = this.state?.family?.currency || 'MXN';
+    const child = this.getSelectedChild();
+    const band = this.getMemberBand(child);
 
     const invAmount = Number(document.getElementById('simInvAmount')?.value || 300);
-    const invDays = Number(document.getElementById('simInvDays')?.value || 30);
-    const invRate = Number(document.getElementById('simInvRate')?.value || 10);
-    document.getElementById('simInvAmountLabel').textContent = formatMoneyCents(invAmount * 100, currency);
+    const planId = document.getElementById('simInvPlan')?.value || 'SHORT';
+    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBpsByBand: { '9_12': 100, '13_17': 75 }, minPrincipalCents: 5000 };
+    const invDays = Number(planObj.termDays || 30);
+    const invBps = Number(planObj.yieldBpsByBand?.[band] || 100);
+    const invRate = (invBps / 100).toFixed(2);
+    const amountLabel = document.getElementById('simInvAmountLabel');
+    if (amountLabel) amountLabel.textContent = formatMoneyCents(invAmount * 100, currency);
 
-    const invYieldCents = Math.round(invAmount * 100 * (invRate / 100));
+    const invYieldCents = Math.floor((invAmount * 100 * invBps) / 10000);
     const invTotalCents = invAmount * 100 + invYieldCents;
-    document.getElementById('simInvResultBox').innerHTML = `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
-        <span>Capital que congelas por ${invDays} días:</span>
-        <strong style="font-family: var(--font-mono);">${formatMoneyCents(invAmount * 100, currency)}</strong>
-      </div>
-      <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
-        <span>Ganancia gratis por esperar (Rendimiento +${invRate}%):</span>
-        <strong style="font-family: var(--font-mono); color: var(--color-income);">+${formatMoneyCents(invYieldCents, currency)}</strong>
-      </div>
-      <div style="display: flex; justify-content: space-between; font-size: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 0.4rem;">
-        <strong>Recibirás al final del plazo:</strong>
-        <strong style="font-family: var(--font-mono); color: var(--color-invest);">${formatMoneyCents(invTotalCents, currency)}</strong>
-      </div>
-    `;
+    const minWarning =
+      invAmount * 100 < Number(planObj.minPrincipalCents || 0)
+        ? `<div style="margin-top: 0.35rem; font-size: 0.78rem; color: var(--color-expense);">El mínimo para ${planObj.label} es ${formatMoneyCents(planObj.minPrincipalCents, currency)}.</div>`
+        : '';
+    const resBox = document.getElementById('simInvResultBox');
+    if (resBox) {
+      resBox.innerHTML = `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+          <span>Plan elegido (${planObj.label} · ${invDays} días):</span>
+          <strong style="font-family: var(--font-mono);">${formatMoneyCents(invAmount * 100, currency)}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+          <span>Ganancia fijada por Papá/Mamá (+${invRate}%):</span>
+          <strong style="font-family: var(--font-mono); color: var(--color-income);">+${formatMoneyCents(invYieldCents, currency)}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 0.4rem;">
+          <strong>Recibirás al terminar el plazo:</strong>
+          <strong style="font-family: var(--font-mono); color: var(--color-invest);">${formatMoneyCents(invTotalCents, currency)}</strong>
+        </div>
+        ${minWarning}
+      `;
+    }
 
     const loanAmount = Number(document.getElementById('simLoanAmount')?.value || 500);
     const loanPeriods = Number(document.getElementById('simLoanPeriods')?.value || 4);
     const loanRate = Number(document.getElementById('simLoanRate')?.value || 5);
     const loanType = document.getElementById('simLoanType')?.value || 'SIMPLE';
-    document.getElementById('simLoanAmountLabel').textContent = formatMoneyCents(loanAmount * 100, currency);
+    const loanLabel = document.getElementById('simLoanAmountLabel');
+    if (loanLabel) loanLabel.textContent = formatMoneyCents(loanAmount * 100, currency);
 
     const plan = generateLoanSchedule({
       principalCents: loanAmount * 100,
@@ -1391,20 +1487,23 @@ class SmartPiggyApp {
     });
 
     const firstInst = plan.schedule[0]?.totalInstallmentCents || 0;
-    document.getElementById('simLoanResultBox').innerHTML = `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
-        <span>Dinero pedido hoy:</span>
-        <strong style="font-family: var(--font-mono);">${formatMoneyCents(plan.principalCents, currency)}</strong>
-      </div>
-      <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
-        <span>Costo extra por intereses (${loanPeriods} cuotas):</span>
-        <strong style="font-family: var(--font-mono); color: var(--color-expense);">+${formatMoneyCents(plan.totalInterestCents, currency)}</strong>
-      </div>
-      <div style="display: flex; justify-content: space-between; font-size: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 0.4rem;">
-        <strong>Total que terminarás pagando (${loanPeriods} pagos de ~${formatMoneyCents(firstInst, currency)}):</strong>
-        <strong style="font-family: var(--font-mono); color: var(--color-loan);">${formatMoneyCents(plan.totalPayableCents, currency)}</strong>
-      </div>
-    `;
+    const loanBox = document.getElementById('simLoanResultBox');
+    if (loanBox) {
+      loanBox.innerHTML = `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+          <span>Dinero pedido hoy:</span>
+          <strong style="font-family: var(--font-mono);">${formatMoneyCents(plan.principalCents, currency)}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+          <span>Costo extra por intereses (${loanPeriods} cuotas):</span>
+          <strong style="font-family: var(--font-mono); color: var(--color-expense);">+${formatMoneyCents(plan.totalInterestCents, currency)}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 0.4rem;">
+          <strong>Total que terminarás pagando (${loanPeriods} pagos de ~${formatMoneyCents(firstInst, currency)}):</strong>
+          <strong style="font-family: var(--font-mono); color: var(--color-loan);">${formatMoneyCents(plan.totalPayableCents, currency)}</strong>
+        </div>
+      `;
+    }
   }
 
   updateLoanModalPreview() {
@@ -1437,20 +1536,29 @@ class SmartPiggyApp {
 
   updateInvestmentModalPreview() {
     const currency = this.state?.family?.currency || 'MXN';
+    const memberId = document.getElementById('invChildSelect')?.value || this.selectedChildId;
+    const member = (this.state?.members || []).find((m) => m.id === memberId) || this.getSelectedChild();
+    const band = this.getMemberBand(member);
     const principal = toCents(document.getElementById('invPrincipalInput')?.value || 250);
-    const days = Number(document.getElementById('invTermDaysInput')?.value || 30);
-    const rate = Number(document.getElementById('invYieldRateInput')?.value || 10);
+    const planId = document.getElementById('invPlanSelect')?.value || 'SHORT';
+    const planObj = this.getPlan(planId) || { id: 'SHORT', label: 'Corto plazo (1 mes)', termDays: 30, yieldBpsByBand: { '9_12': 100, '13_17': 75 }, minPrincipalCents: 5000 };
+    const days = Number(planObj.termDays || 30);
+    const bps = Number(planObj.yieldBpsByBand?.[band] || 100);
+    const rate = (bps / 100).toFixed(2);
     const maturityDate = addDaysLocalDate(getTodayLocalDate(), days);
-    const yieldCents = Math.round(principal * (rate / 100));
+    const yieldCents = Math.floor((principal * bps) / 10000);
+    const editId = (document.getElementById('invEditIdInput')?.value || '').trim() || null;
+    const valCheck = member ? this.validatePlanInvestment(member, planId, principal, editId) : {};
 
     const box = document.getElementById('invPreviewBox');
     if (box) {
       box.innerHTML = `
-        <span class="inline-icon-text">
+        <span class="inline-icon-text" style="flex-wrap: wrap;">
           ${renderSvgIcon('trending-up', 16)}
-          <span><strong>Proyección del Pagaré:</strong> Se congelarán <strong>${formatMoneyCents(principal, currency)}</strong> hasta el <strong>${maturityDate}</strong> (${days} días).
-          Rendimiento garantizado: <strong style="color: var(--color-income);">+${formatMoneyCents(yieldCents, currency)}</strong>.
-          Total a recibir al vencimiento: <strong>${formatMoneyCents(principal + yieldCents, currency)}</strong>.</span>
+          <span><strong>${planObj.label} (${days} días · Tasa preestablecida +${rate}%):</strong> Se guardarán <strong>${formatMoneyCents(principal, currency)}</strong> hasta el <strong>${maturityDate}</strong>.
+          Ganancia garantizada: <strong style="color: var(--color-income);">+${formatMoneyCents(yieldCents, currency)}</strong> ·
+          Recibirás al final: <strong>${formatMoneyCents(principal + yieldCents, currency)}</strong>.
+          ${valCheck.error ? `<br/><strong style="color: var(--color-expense);">${valCheck.error}</strong>` : ''}</span>
         </span>
       `;
     }
@@ -1836,8 +1944,9 @@ class SmartPiggyApp {
       await this.submitExtraPrincipalForm();
     });
 
-    ['invPrincipalInput', 'invTermDaysInput', 'invYieldRateInput'].forEach((id) => {
+    ['invPrincipalInput', 'invPlanSelect', 'invChildSelect'].forEach((id) => {
       document.getElementById(id)?.addEventListener('input', () => this.updateInvestmentModalPreview());
+      document.getElementById(id)?.addEventListener('change', () => this.updateInvestmentModalPreview());
     });
     document.getElementById('formInvestment')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1854,8 +1963,9 @@ class SmartPiggyApp {
       await this.submitCatalogForm();
     });
 
-    ['simInvAmount', 'simInvDays', 'simInvRate', 'simLoanAmount', 'simLoanPeriods', 'simLoanRate', 'simLoanType'].forEach((id) => {
+    ['simInvAmount', 'simInvPlan', 'simLoanAmount', 'simLoanPeriods', 'simLoanRate', 'simLoanType'].forEach((id) => {
       document.getElementById(id)?.addEventListener('input', () => this.updateSimulatorPreviews());
+      document.getElementById(id)?.addEventListener('change', () => this.updateSimulatorPreviews());
     });
 
     document.getElementById('btnSendInvestRequest')?.addEventListener('click', () => this.sendSandboxRequest('INVESTMENT'));
@@ -1954,10 +2064,11 @@ class SmartPiggyApp {
     });
   }
 
-  openInvestmentDialog(editInvId = null) {
+  openInvestmentDialog(editInvId = null, preselectPlanId = null) {
     this.runAsParent(() => {
       this.populateChildAndCatalogSelectors('INCOME');
       const editInput = document.getElementById('invEditIdInput');
+      const planSelect = document.getElementById('invPlanSelect');
       const inv = editInvId ? (this.state.investments || []).find((i) => i.id === editInvId) : null;
       if (inv) {
         if (editInput) editInput.value = inv.id;
@@ -1965,12 +2076,16 @@ class SmartPiggyApp {
         document.getElementById('invChildSelect').value = inv.memberId;
         document.getElementById('invPrincipalInput').value = (Number(inv.principalCents || 0) / 100).toFixed(2);
         document.getElementById('invTitleInput').value = inv.title || '';
-        document.getElementById('invTermDaysInput').value = String(inv.termDays || 30);
-        document.getElementById('invYieldRateInput').value = String(inv.yieldRatePercent || 10);
+        if (planSelect) {
+          planSelect.value = inv.planId || (inv.termDays >= 300 ? 'LONG' : inv.termDays >= 120 ? 'MEDIUM' : 'SHORT');
+        }
       } else {
         if (editInput) editInput.value = '';
         document.getElementById('dialogInvestmentTitle').innerHTML = `${renderSvgIcon('trending-up', 19)} Guardar Dinero a Plazo para Ganar Más`;
-        document.getElementById('invPrincipalInput').value = '250';
+        const chosenPlan = this.getPlan(preselectPlanId || 'SHORT');
+        if (planSelect && chosenPlan) planSelect.value = chosenPlan.id;
+        const minDollars = Math.max(100, Math.round(Number(chosenPlan?.minPrincipalCents || 10000) / 100));
+        document.getElementById('invPrincipalInput').value = String(minDollars);
         document.getElementById('invTitleInput').value = '';
       }
       this.updateInvestmentModalPreview();
@@ -2613,21 +2728,33 @@ class SmartPiggyApp {
     await this.runAsParent(async () => {
       const editId = (document.getElementById('invEditIdInput')?.value || '').trim();
       const memberId = document.getElementById('invChildSelect').value;
+      const member = (this.state.members || []).find((m) => m.id === memberId) || this.getSelectedChild();
       const principalCents = toCents(document.getElementById('invPrincipalInput').value);
       const title = document.getElementById('invTitleInput').value.trim();
-      const termDays = Math.max(1, Number(document.getElementById('invTermDaysInput').value || 30));
-      const yieldRatePercent = Math.max(0.5, Number(document.getElementById('invYieldRateInput').value || 10));
+      const planId = document.getElementById('invPlanSelect')?.value || 'SHORT';
       const today = getTodayLocalDate();
+
+      if (!member) return;
+      const val = this.validatePlanInvestment(member, planId, principalCents, editId || null);
+      if (val.error) {
+        this.showToast(val.error, 'warn');
+        return;
+      }
 
       if (editId) {
         const existing = (this.state.investments || []).find((i) => i.id === editId);
         if (existing) {
           existing.memberId = memberId;
-          existing.title = title;
+          existing.title = title || val.plan.label;
           existing.principalCents = principalCents;
-          existing.termDays = termDays;
-          existing.yieldRatePercent = yieldRatePercent;
-          existing.maturityDate = addDaysLocalDate(existing.startDate || today, termDays);
+          existing.planId = val.plan.id;
+          existing.planVersion = val.plan.version || 1;
+          existing.ageBand = val.band;
+          existing.yieldBpsSnapshot = val.bps;
+          existing.yieldRatePercent = val.bps / 100;
+          existing.expectedYieldCents = val.expectedYieldCents;
+          existing.termDays = val.plan.termDays;
+          existing.maturityDate = addDaysLocalDate(existing.startDate || today, val.plan.termDays);
           existing.updatedAt = new Date().toISOString();
 
           const lockEv = (this.state.ledgerEvents || []).find(
@@ -2636,7 +2763,15 @@ class SmartPiggyApp {
           if (lockEv) {
             lockEv.memberId = memberId;
             lockEv.amountCents = principalCents;
-            lockEv.note = `Ahorro a Plazo (${termDays} días al +${yieldRatePercent}%): ${title}`;
+            lockEv.note = `Ahorro ${val.plan.label}: ${existing.title}`;
+            lockEv.metadata = {
+              planId: val.plan.id,
+              planVersion: val.plan.version || 1,
+              ageBand: val.band,
+              yieldBps: val.bps,
+              termDays: val.plan.termDays,
+              expectedYieldCents: val.expectedYieldCents
+            };
             lockEv.updatedAt = new Date().toISOString();
             await this.reSignLedgerChain();
           }
@@ -2645,68 +2780,36 @@ class SmartPiggyApp {
           document.getElementById('dialogInvestment')?.close();
           await this.cloudManager.pushState(this.state);
           await this.runLedgerAuditAndRender();
-          this.showToast(`Ahorro a plazo "${title}" modificado.`, 'success');
+          this.showToast(`Ahorro a plazo "${existing.title}" modificado.`, 'success');
           return;
         }
       }
 
-      const childFinance = reduceMemberFinancialState({
-        memberId,
-        validEvents: this.auditResult.validEvents,
-        loans: this.state.loans,
-        investments: this.state.investments,
-        catalogs: this.state.catalogs
-      });
-
-      if (principalCents > childFinance.availableCents) {
+      if (principalCents > val.fin.availableCents) {
         this.showToast(
-          `El monto a guardar (${formatMoneyCents(principalCents)}) supera el dinero libre en la alcancía (${formatMoneyCents(childFinance.availableCents)}). Primero mete dinero en la alcancía.`,
+          `El monto a guardar (${formatMoneyCents(principalCents)}) supera el dinero libre en la alcancía (${formatMoneyCents(val.fin.availableCents)}). Primero mete dinero en la alcancía.`,
           'warn'
         );
         return;
       }
 
-      const newInv = {
-        id: `inv_${Date.now()}`,
-        familyId: this.state.family.id,
-        memberId,
-        title,
+      const created = await this.createPlanInvestmentSigned({
+        member,
+        planId,
         principalCents,
-        yieldRatePercent,
-        termDays,
-        startDate: today,
-        maturityDate: addDaysLocalDate(today, termDays),
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+        title: title || val.plan.label
+      });
+      if (created.error) {
+        this.showToast(created.error, 'warn');
+        return;
+      }
 
-      this.state.investments.push(newInv);
-
-      const signedLock = await createSignedLedgerEvent(
-        {
-          familyId: this.state.family.id,
-          memberId,
-          createdByParentId: this.activeParentId,
-          type: 'INVESTMENT_LOCK',
-          amountCents: principalCents,
-          catalogId: 'cat_inc_yield',
-          referenceId: newInv.id,
-          note: `Ahorro a Plazo (${termDays} días al +${yieldRatePercent}%): ${title}`,
-          localDate: today
-        },
-        this.parentSigningKey,
-        this.state.family.saltHex,
-        this.getLastEventHash()
-      );
-
-      this.state.ledgerEvents.push(signedLock);
       this.selectedChildId = memberId;
       document.getElementById('dialogInvestment')?.close();
 
       await this.cloudManager.pushState(this.state);
       await this.runLedgerAuditAndRender();
-      this.showToast(`Ahorro a plazo "${title}" iniciado.`, 'success');
+      this.showToast(`Ahorro a plazo "${created.inv.title}" iniciado.`, 'success');
     });
   }
 
@@ -2729,24 +2832,32 @@ class SmartPiggyApp {
       const inv = (this.state.investments || []).find((i) => i.id === investmentId && i.status === 'ACTIVE');
       if (!inv) return;
 
-      const evalInv = evaluateInvestmentProgress(inv, getTodayLocalDate());
+      const resolved = resolveSignedInvestment(inv, this.auditResult.validEvents);
+      const evalInv = evaluateInvestmentProgress(resolved || inv, getTodayLocalDate());
       const today = getTodayLocalDate();
 
       if (isEarlyExit) {
         inv.status = 'CANCELLED_EARLY';
         inv.updatedAt = new Date().toISOString();
 
+        const payoutCents = Number(evalInv.earlyExitPayoutCents || inv.principalCents);
+        const earlyYieldCents = Number(evalInv.earlyExitYieldCents || 0);
+
         const signedEarly = await createSignedLedgerEvent(
           {
+            id: `det_inv_exit_${inv.id}`,
             familyId: this.state.family.id,
             memberId: inv.memberId,
             createdByParentId: this.activeParentId,
             type: 'INVESTMENT_EARLY_EXIT',
-            amountCents: inv.principalCents,
+            amountCents: payoutCents,
             catalogId: 'cat_inc_yield',
             referenceId: inv.id,
-            metadata: { principalCents: inv.principalCents, yieldCents: 0 },
-            note: `Retiro antes de tiempo de "${inv.title}" (Sin premio)`,
+            metadata: { principalCents: inv.principalCents, yieldCents: earlyYieldCents },
+            note:
+              earlyYieldCents > 0
+                ? `Retiro antes de tiempo de "${inv.title}" (+${formatMoneyCents(earlyYieldCents)} mitad de ganancia)`
+                : `Retiro antes de tiempo de "${inv.title}" (Solo capital)`,
             localDate: today
           },
           this.parentSigningKey,
@@ -2754,7 +2865,12 @@ class SmartPiggyApp {
           this.getLastEventHash()
         );
         this.state.ledgerEvents.push(signedEarly);
-        this.showToast(`Se devolvieron ${formatMoneyCents(inv.principalCents)} al dinero libre.`, 'info');
+        this.showToast(
+          earlyYieldCents > 0
+            ? `Se devolvieron ${formatMoneyCents(payoutCents)} (incluye +${formatMoneyCents(earlyYieldCents)} de ganancia parcial).`
+            : `Se devolvieron ${formatMoneyCents(inv.principalCents)} al dinero libre.`,
+          'info'
+        );
       } else {
         inv.status = 'MATURED';
         inv.updatedAt = new Date().toISOString();
@@ -2939,18 +3055,25 @@ class SmartPiggyApp {
     let newReq;
     if (requestType === 'INVESTMENT') {
       const amount = Number(document.getElementById('simInvAmount').value || 300);
-      const termDays = Number(document.getElementById('simInvDays').value || 30);
-      const ratePercent = Number(document.getElementById('simInvRate').value || 10);
+      const planId = document.getElementById('simInvPlan')?.value || 'SHORT';
+      const val = this.validatePlanInvestment(child, planId, amount * 100);
+      if (val.error) {
+        this.showToast(val.error, 'warn');
+        return;
+      }
+      const termDays = val.plan.termDays;
+      const ratePercent = Number((val.bps / 100).toFixed(2));
       newReq = {
         id: `req_${Date.now()}`,
         familyId: this.state.family.id,
         memberId: child.id,
         requestType: 'INVESTMENT',
-        title: `Guardar ${formatMoneyCents(amount * 100)} a ${termDays} días (+${ratePercent}%)`,
+        planId: val.plan.id,
+        title: `${val.plan.label}: Guardar ${formatMoneyCents(amount * 100)} (+${ratePercent}%)`,
         amountCents: amount * 100,
         termDays,
         ratePercent,
-        note: `Pedido enviado desde la Calculadora por ${child.name} para ganar +${formatMoneyCents(Math.round(amount * 100 * (ratePercent / 100)))} al terminar el plazo.`,
+        note: `Pedido enviado por ${child.name} en el plan ${val.plan.label} (${termDays} días) para ganar +${formatMoneyCents(val.expectedYieldCents)} al terminar el plazo.`,
         status: 'PENDING',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -2995,6 +3118,12 @@ class SmartPiggyApp {
   }
 
   async handleProcessChildRequest(reqId, approve = true) {
+    const preReq = (this.state.childRequests || []).find((r) => r.id === reqId && r.status === 'PENDING');
+    if (preReq && preReq.requestType === 'FINE_APPEAL') {
+      await this.resolveFine(preReq.refId, approve ? 'REMOVE' : 'KEEP');
+      return;
+    }
+
     await this.runAsParent(async () => {
       const req = (this.state.childRequests || []).find((r) => r.id === reqId && r.status === 'PENDING');
       if (!req) {
@@ -3013,19 +3142,19 @@ class SmartPiggyApp {
 
       const today = getTodayLocalDate();
       if (req.requestType === 'INVESTMENT') {
-        const childFinance = reduceMemberFinancialState({
-          memberId: req.memberId,
-          validEvents: this.auditResult.validEvents,
-          loans: this.state.loans,
-          investments: this.state.investments,
-          catalogs: this.state.catalogs
-        });
+        const member = (this.state.members || []).find((m) => m.id === req.memberId) || this.getSelectedChild();
+        const planId = req.planId || (req.termDays >= 300 ? 'LONG' : req.termDays >= 120 ? 'MEDIUM' : 'SHORT');
+        const val = this.validatePlanInvestment(member, planId, req.amountCents);
+        if (val.error) {
+          this.showToast(val.error, 'warn');
+          return;
+        }
 
         // Si la alcancía no tiene saldo suficiente para cubrir el ahorro a plazo pedido,
         // acreditamos automáticamente el faltante como depósito autorizado por Papá/Mamá
         // para que el botón "Aprobar Pedido" siempre funcione de inmediato.
-        if (req.amountCents > childFinance.availableCents) {
-          const shortfallCents = req.amountCents - Math.max(0, childFinance.availableCents);
+        if (req.amountCents > val.fin.availableCents) {
+          const shortfallCents = req.amountCents - Math.max(0, val.fin.availableCents);
           const signedFunding = await createSignedLedgerEvent(
             {
               familyId: this.state.family.id,
@@ -3042,41 +3171,16 @@ class SmartPiggyApp {
             this.getLastEventHash()
           );
           this.state.ledgerEvents.push(signedFunding);
+          this.auditResult.validEvents.push(signedFunding);
         }
 
-        const newInv = {
-          id: `inv_req_${Date.now()}`,
-          familyId: this.state.family.id,
-          memberId: req.memberId,
-          title: req.title,
+        await this.createPlanInvestmentSigned({
+          member,
+          planId,
           principalCents: req.amountCents,
-          yieldRatePercent: req.ratePercent || 10,
-          termDays: req.termDays || 30,
-          startDate: today,
-          maturityDate: addDaysLocalDate(today, req.termDays || 30),
-          status: 'ACTIVE',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        this.state.investments.push(newInv);
-
-        const signedLock = await createSignedLedgerEvent(
-          {
-            familyId: this.state.family.id,
-            memberId: req.memberId,
-            createdByParentId: this.activeParentId,
-            type: 'INVESTMENT_LOCK',
-            amountCents: req.amountCents,
-            catalogId: 'cat_inc_yield',
-            referenceId: newInv.id,
-            note: `Ahorro a Plazo aprobado desde Calculadora: ${req.title}`,
-            localDate: today
-          },
-          this.parentSigningKey,
-          this.state.family.saltHex,
-          this.getLastEventHash()
-        );
-        this.state.ledgerEvents.push(signedLock);
+          title: req.title,
+          note: `Ahorro a Plazo aprobado desde Calculadora: ${req.title}`
+        });
       } else if (req.requestType === 'LOAN') {
         const plan = generateLoanSchedule({
           principalCents: req.amountCents,
@@ -3414,10 +3518,13 @@ class SmartPiggyApp {
       const prevVerifier = this.state?.family?.authVerifier;
       const prevFamilyCode = this.state?.family?.familyCode || 'FAM-2026-KIDS';
 
-      const allOldIds = new Set(Array.isArray(this.state?.family?.deletedIds) ? this.state.family.deletedIds : []);
-      for (const col of ['ledgerEvents', 'loans', 'investments', 'recurringRules', 'childRequests']) {
+      // deletedIds es un mapa { id: fechaISO } (tombstones del CRDT)
+      const prevDeleted = this.state?.family?.deletedIds;
+      const allOldIds = prevDeleted && typeof prevDeleted === 'object' && !Array.isArray(prevDeleted) ? { ...prevDeleted } : {};
+      const tombstoneIso = new Date().toISOString();
+      for (const col of ['ledgerEvents', 'loans', 'investments', 'recurringRules', 'childRequests', 'tasks', 'taskClaims', 'taskReviews']) {
         (this.state?.[col] || []).forEach((item) => {
-          if (item?.id) allOldIds.add(item.id);
+          if (item?.id) allOldIds[item.id] = tombstoneIso;
         });
       }
 
@@ -3427,7 +3534,7 @@ class SmartPiggyApp {
         cleanState.family.authVerifier = prevVerifier;
       }
       cleanState.family.resetEpoch = Date.now();
-      cleanState.family.deletedIds = Array.from(allOldIds);
+      cleanState.family.deletedIds = allOldIds;
       cleanState.family.updatedAt = new Date().toISOString();
 
       this.state = cleanState;
@@ -3481,6 +3588,7 @@ class SmartPiggyApp {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  installRulesFeatures(SmartPiggyApp);
   const app = new SmartPiggyApp();
   app.init();
 });

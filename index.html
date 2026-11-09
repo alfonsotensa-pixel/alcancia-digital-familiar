@@ -103,6 +103,14 @@
           Dar Préstamo
         </button>
 
+        <button type="button" class="btn btn-primary" data-switch-tab="tab-tasks">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
+          Tareas y Retos
+        </button>
+        <button type="button" class="btn btn-ghost" data-switch-tab="tab-rules">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+          Reglas y Multas
+        </button>
         <button type="button" class="btn btn-warn" id="btnGoSandbox">
           <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></svg>
           Probar en Simulador
@@ -180,6 +188,18 @@
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         Historial y Gastos
       </button>
+      <button type="button" class="nav-tab" data-tab="tab-tasks" role="tab" aria-selected="false">
+        <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
+        Tareas y Retos
+      </button>
+      <button type="button" class="nav-tab" data-tab="tab-rules" role="tab" aria-selected="false">
+        <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+        Reglas y Multas
+      </button>
+      <button type="button" class="nav-tab" data-tab="tab-investments" role="tab" aria-selected="false">
+        <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        Ahorro con Ganancia
+      </button>
       <button type="button" class="nav-tab" data-tab="tab-recurring" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
         Mesadas Automáticas
@@ -187,10 +207,6 @@
       <button type="button" class="nav-tab" data-tab="tab-loans" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
         Préstamos
-      </button>
-      <button type="button" class="nav-tab" data-tab="tab-investments" role="tab" aria-selected="false">
-        <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-        Ahorro con Ganancia
       </button>
       <button type="button" class="nav-tab" data-tab="tab-users-catalogs" role="tab" aria-selected="false">
         <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -219,7 +235,9 @@
               <select id="filterTxType" class="form-select" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;" aria-label="Filtrar movimientos">
                 <option value="ALL">Ver todo</option>
                 <option value="INCOME">Solo Dinero Recibido</option>
+                <option value="TASK">Solo Tareas y Retos</option>
                 <option value="EXPENSE">Solo Gastos</option>
+                <option value="FINE">Solo Multas</option>
                 <option value="LOAN">Solo Préstamos</option>
                 <option value="INVESTMENT">Solo Ahorro a Plazo</option>
               </select>
@@ -247,6 +265,88 @@
               </h3>
             </div>
             <div id="expenseCategoriesChartContainer"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL 1B: TAREAS Y RETOS FAMILIARES -->
+    <section class="tab-panel" id="tab-tasks" role="tabpanel">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">
+              <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
+              Tareas y Retos Propuestos por Papá y Mamá
+            </h2>
+            <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);">
+              Las <strong>Tareas Extra</strong> tienen pago al aprobarse; las <strong>Responsabilidades</strong> son parte de vivir en familia. Puedes aceptar una tarea libre o un reto para todos.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-income" id="btnApproveAllTasks" style="display: none;">
+              Aprobar todo
+            </button>
+            <button type="button" class="btn btn-primary" id="btnCreateTask">
+              <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Crear Tarea o Reto
+            </button>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.9rem; margin-bottom: 1.15rem;">
+          <h3 class="inline-icon-text" style="margin: 0 0 0.55rem 0; font-size: 0.96rem;">
+            <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            Tareas Terminadas por Revisar (Papá / Mamá)
+          </h3>
+          <div class="tx-list" id="tasksReviewContainer"></div>
+        </div>
+
+        <h3 style="margin: 0 0 0.65rem 0; font-size: 1rem;">Tablero de Tareas y Retos Activos</h3>
+        <div class="equal-col-grid" id="tasksBoardContainer"></div>
+
+        <div style="margin-top: 1.25rem;">
+          <h3 style="margin: 0 0 0.55rem 0; font-size: 0.95rem;">Últimas Tareas Terminadas</h3>
+          <div class="tx-list" id="tasksDoneContainer"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL 1C: REGLAS DE LA CASA Y MULTAS PREESTABLECIDAS -->
+    <section class="tab-panel" id="tab-rules" role="tabpanel">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">
+              <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+              Reglas de la Casa y Multas Preestablecidas (Leve, Media y Grave)
+            </h2>
+            <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);">
+              Reglas claras que todos conocemos antes. Ninguna multa deja la alcancía en negativo y tienes 72 horas para pedir revisión si no estás de acuerdo.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-expense" id="btnApplyFine">
+              <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+              Aplicar Multa
+            </button>
+            <button type="button" class="btn btn-ghost" id="btnAddFinePreset">
+              <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva Regla
+            </button>
+          </div>
+        </div>
+
+        <div id="fineCapInfoBox" style="background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1rem;"></div>
+
+        <div class="two-col-grid">
+          <div>
+            <h3 style="margin: 0 0 0.6rem 0; font-size: 0.96rem;">Catálogo de Multas (Leve · Media · Grave)</h3>
+            <div id="finePresetsContainer"></div>
+          </div>
+          <div>
+            <h3 style="margin: 0 0 0.6rem 0; font-size: 0.96rem;">Multas de esta Alcancía y Apelaciones</h3>
+            <div class="tx-list" id="childFinesContainer"></div>
           </div>
         </div>
       </div>
@@ -296,24 +396,34 @@
       </div>
     </section>
 
-    <!-- PANEL 4: AHORRO CON GANANCIA (INVERSIONES A PLAZO) -->
+    <!-- PANEL 4: AHORRO CON GANANCIA (INVERSIONES A PLAZO PREESTABLECIDAS) -->
     <section class="tab-panel" id="tab-investments" role="tabpanel">
       <div class="panel-card">
         <div class="panel-header">
           <div>
             <h2 class="panel-title">
               <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-              Bóveda de Ahorro con Ganancia
+              Bóveda de Ahorro con Ganancia (Corto, Mediano y Largo Plazo)
             </h2>
-            <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);">
-              Guarda una parte de tu dinero por varios días sin tocarlo y gana dinero extra al terminar el plazo.
+            <p style="margin: 0.2rem 0 0 0; font-size: 0.84rem; color: var(--text-muted);" id="investmentPlansNote">
+              Elige uno de los 3 planes de ahorro a plazo con tasa de interés preestablecida por Papá y Mamá.
             </p>
           </div>
-          <button type="button" class="btn btn-invest" id="btnOpenInvestmentModal">
-            <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Guardar Dinero a Plazo
-          </button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-ghost" id="btnEditPlans">
+              <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              Configurar Tasas y Límites (Papá/Mamá)
+            </button>
+            <button type="button" class="btn btn-invest" id="btnOpenInvestmentModal">
+              <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Guardar Dinero a Plazo
+            </button>
+          </div>
         </div>
+
+        <div class="equal-col-grid" id="investmentPlansContainer" style="margin-bottom: 1.25rem;"></div>
+
+        <h3 style="margin: 0 0 0.65rem 0; font-size: 0.98rem;">Mis Ahorros Guardados a Plazo</h3>
         <div class="equal-col-grid" id="investmentsListContainer"></div>
       </div>
     </section>
@@ -392,23 +502,15 @@
             </h3>
             <div class="form-group">
               <label class="form-label" for="simInvAmount">¿Cuánto quieres guardar? <strong id="simInvAmountLabel">$300.00</strong></label>
-              <input type="range" id="simInvAmount" min="50" max="5000" step="50" value="300" style="width: 100%;" />
+              <input type="range" id="simInvAmount" min="50" max="3000" step="50" value="300" style="width: 100%;" />
             </div>
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label" for="simInvDays">¿Por cuántos días?</label>
-                <select id="simInvDays" class="form-select">
-                  <option value="7">7 días (1 semana)</option>
-                  <option value="14">14 días (2 semanas)</option>
-                  <option value="30" selected>30 días (1 mes)</option>
-                  <option value="60">60 días (2 meses)</option>
-                  <option value="90">90 días (3 meses)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="simInvRate">Premio / Ganancia (%)</label>
-                <input type="number" id="simInvRate" class="form-input" value="10" min="1" max="50" step="0.5" />
-              </div>
+            <div class="form-group">
+              <label class="form-label" for="simInvPlan">Elige el Plan de Ahorro (Tasa preestablecida por tus Papás)</label>
+              <select id="simInvPlan" class="form-select">
+                <option value="SHORT" selected>Corto plazo — 1 mes (30 días)</option>
+                <option value="MEDIUM">Mediano plazo — 6 meses (182 días)</option>
+                <option value="LONG">Largo plazo — 1 año (365 días)</option>
+              </select>
             </div>
 
             <div id="simInvResultBox" style="background: var(--bg-elevated); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem;"></div>
@@ -939,16 +1041,16 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
             <input type="number" id="invPrincipalInput" class="form-input" min="10" step="1" value="250" required />
           </div>
           <div class="form-group full">
-            <label class="form-label" for="invTitleInput">Nombre de este ahorro</label>
-            <input type="text" id="invTitleInput" class="form-input" placeholder="Ej. Ahorro de 30 días para mi meta" required />
+            <label class="form-label" for="invPlanSelect">Plan de Ahorro a Plazo (Tasa preestablecida por Papá/Mamá)</label>
+            <select id="invPlanSelect" class="form-select" required>
+              <option value="SHORT">Corto plazo — 1 mes (30 días)</option>
+              <option value="MEDIUM">Mediano plazo — 6 meses (182 días)</option>
+              <option value="LONG">Largo plazo — 1 año (365 días)</option>
+            </select>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="invTermDaysInput">¿Por cuántos días se guarda?</label>
-            <input type="number" id="invTermDaysInput" class="form-input" min="1" max="365" value="30" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="invYieldRateInput">Premio / Ganancia al terminar (%)</label>
-            <input type="number" id="invYieldRateInput" class="form-input" min="0.5" max="100" step="0.5" value="10" required />
+          <div class="form-group full">
+            <label class="form-label" for="invTitleInput">Nombre de este ahorro (opcional)</label>
+            <input type="text" id="invTitleInput" class="form-input" placeholder="Ej. Ahorro para mi meta" />
           </div>
         </div>
 
@@ -1112,6 +1214,268 @@ alter publication supabase_realtime add table public.smartpiggy_families;</pre>
           <button type="button" class="btn btn-primary" data-close-dialog="dialogInstallPwa">Listo</button>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <!-- 10. Modal para Crear / Modificar Tarea o Reto -->
+  <dialog class="app-dialog" id="dialogTask">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h3 class="dialog-title inline-icon-text" id="dialogTaskTitle">Crear Tarea o Reto</h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogTask" aria-label="Cerrar">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="formTask">
+        <input type="hidden" id="taskEditIdInput" value="" />
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label" for="taskTemplateSelect">Usar una tarea sugerida (opcional)</label>
+            <select id="taskTemplateSelect" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="taskKindSelect">Tipo de tarea</label>
+            <select id="taskKindSelect" class="form-select">
+              <option value="EXTRA">Tarea Extra / Reto (Con pago)</option>
+              <option value="RESPONSIBILITY">Responsabilidad de casa ($0, sin pago)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="taskIconSelect">Icono</label>
+            <select id="taskIconSelect" class="form-select"></select>
+          </div>
+          <div class="form-group full">
+            <p id="taskKindHint" style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);"></p>
+          </div>
+          <div class="form-group full">
+            <label class="form-label" for="taskTitleInput">Nombre de la tarea o reto</label>
+            <input type="text" id="taskTitleInput" class="form-input" placeholder="Ej. Lavar el coche por fuera" required />
+          </div>
+          <div class="form-group full">
+            <label class="form-label" for="taskDescInput">¿Qué debe quedar listo para aprobarse?</label>
+            <input type="text" id="taskDescInput" class="form-input" placeholder="Ej. Carrocería, vidrios y llantas limpias" required />
+          </div>
+          <div class="form-group" id="taskRewardGroup912">
+            <label class="form-label" for="taskReward912Input">Pago para 9 a 12 años ($)</label>
+            <input type="number" id="taskReward912Input" class="form-input" min="0" max="500" step="1" value="25" />
+          </div>
+          <div class="form-group" id="taskRewardGroup1317">
+            <label class="form-label" for="taskReward1317Input">Pago para 13 a 17 años ($)</label>
+            <input type="number" id="taskReward1317Input" class="form-input" min="0" max="500" step="1" value="40" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="taskSlotsSelect">¿Cuántos hijos pueden aceptarla?</label>
+            <select id="taskSlotsSelect" class="form-select">
+              <option value="1">1 hijo/a (el primero que la tome)</option>
+              <option value="2">Hasta 2 hijos</option>
+              <option value="3">Hasta 3 hijos</option>
+              <option value="ALL">Abierta para todos los hijos</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="taskUnitSelect">¿Cómo se mide?</label>
+            <select id="taskUnitSelect" class="form-select">
+              <option value="ONCE">Por evento terminado</option>
+              <option value="LOAD">Por carga completa</option>
+              <option value="WEEK">Reto semanal</option>
+              <option value="WEEKEND">Reto de fin de semana</option>
+              <option value="DAILY"> Hábito diario</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="taskDueDateInput">Fecha límite</label>
+            <input type="date" id="taskDueDateInput" class="form-input" required />
+          </div>
+          <div class="form-group full">
+            <label class="form-label">¿Quiénes pueden ver y aceptar esta tarea?</label>
+            <div id="taskEligibleBox" style="display: flex; gap: 0.75rem; flex-wrap: wrap;"></div>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.6rem;">
+          <button type="button" class="btn btn-ghost" data-close-dialog="dialogTask">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Publicar Tarea</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 11. Modal para Aplicar una Multa -->
+  <dialog class="app-dialog" id="dialogFine">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h3 class="dialog-title inline-icon-text">
+          <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+          Aplicar una Multa Preestablecida
+        </h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogFine" aria-label="Cerrar">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="formFine">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="fineChildSelect">¿A quién se aplica?</label>
+            <select id="fineChildSelect" class="form-select" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="finePresetSelect">Regla / Multa (Leve, Media o Grave)</label>
+            <select id="finePresetSelect" class="form-select" required></select>
+          </div>
+          <div class="form-group full" id="fineRepairGroup" style="display: none;">
+            <label class="form-label" for="fineRepairCostInput">¿Cuánto cuesta reparar o reponer lo dañado? ($)</label>
+            <input type="number" id="fineRepairCostInput" class="form-input" min="10" step="5" value="100" />
+            <label class="inline-icon-text" style="margin-top: 0.45rem; font-size: 0.84rem; gap: 0.4rem;">
+              <input type="checkbox" id="fineConfessedCheck" />
+              <span>Lo dijo solo/a con honestidad (paga solo la mitad de la reparación)</span>
+            </label>
+          </div>
+          <div class="form-group full">
+            <label class="form-label" for="fineReasonInput">Explicación clara de qué pasó</label>
+            <input type="text" id="fineReasonInput" class="form-input" placeholder="Ej. Dejó la TV del cuarto prendida toda la tarde" required />
+          </div>
+        </div>
+        <div id="finePreviewBox" style="background: var(--bg-elevated); padding: 0.85rem; border-radius: var(--radius-sm); font-size: 0.84rem; margin-bottom: 1rem;"></div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+          <button type="button" class="btn btn-ghost" data-close-dialog="dialogFine">Cancelar</button>
+          <button type="submit" class="btn btn-expense">Aplicar Multa</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 12. Modal para Crear / Modificar Regla con Multa en el Catálogo -->
+  <dialog class="app-dialog" id="dialogFinePreset">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h3 class="dialog-title inline-icon-text" id="dialogFinePresetTitle">Nueva Regla con Multa</h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogFinePreset" aria-label="Cerrar">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="formFinePreset">
+        <input type="hidden" id="fpEditIdInput" value="" />
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="fpLevelSelect">Nivel de la multa</label>
+            <select id="fpLevelSelect" class="form-select">
+              <option value="LEVE">Leve</option>
+              <option value="MEDIA">Media</option>
+              <option value="GRAVE">Grave</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fpKindSelect">Forma de cobro</label>
+            <select id="fpKindSelect" class="form-select">
+              <option value="FIXED">Monto fijo</option>
+              <option value="REPAIR">Reparación (50% del daño con tope)</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <p id="fpLimitsHint" style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fpTitleInput">Nombre de la regla</label>
+            <input type="text" id="fpTitleInput" class="form-input" placeholder="Ej. Luces o TV prendidas sin nadie" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fpIconSelect">Icono</label>
+            <select id="fpIconSelect" class="form-select"></select>
+          </div>
+          <div class="form-group full">
+            <label class="form-label" for="fpDescInput">Descripción clara</label>
+            <input type="text" id="fpDescInput" class="form-input" placeholder="Explica cuándo aplica esta regla" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fpAmount912Input">Monto / Tope 9 a 12 años ($)</label>
+            <input type="number" id="fpAmount912Input" class="form-input" min="1" max="300" step="1" value="10" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fpAmount1317Input">Monto / Tope 13 a 17 años ($)</label>
+            <input type="number" id="fpAmount1317Input" class="form-input" min="1" max="500" step="1" value="15" required />
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem;">
+          <button type="button" class="btn btn-ghost" data-close-dialog="dialogFinePreset">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Regla</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 13. Modal para Configurar Tasas Preestablecidas (Corto, Mediano, Largo) y Topes -->
+  <dialog class="app-dialog" id="dialogPlans">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h3 class="dialog-title inline-icon-text">
+          <svg class="svg-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          Configurar Tasas de Ahorro (1m, 6m, 1 año) y Topes
+        </h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogPlans" aria-label="Cerrar">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form id="formPlans">
+        <p style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 0;">
+          Define el porcentaje total que gana el ahorro en cada plazo y los límites de protección familiar.
+        </p>
+        <div class="table-wrap" style="margin-bottom: 1rem;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Plan de Ahorro</th>
+                <th>Tasa total 9–12 (%)</th>
+                <th>Tasa total 13–17 (%)</th>
+                <th>Mínimo ($)</th>
+              </tr>
+            </thead>
+            <tbody id="plansEditorBody"></tbody>
+          </table>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" for="cfgInvestCap912">Tope ahorrado a plazo 9–12 ($)</label>
+            <input type="number" id="cfgInvestCap912" class="form-input" min="100" step="50" value="1500" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgInvestCap1317">Tope ahorrado a plazo 13–17 ($)</label>
+            <input type="number" id="cfgInvestCap1317" class="form-input" min="100" step="50" value="3000" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgTaskCap912">Tope mensual tareas extra 9–12 ($)</label>
+            <input type="number" id="cfgTaskCap912" class="form-input" min="50" step="20" value="320" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgTaskCap1317">Tope mensual tareas extra 13–17 ($)</label>
+            <input type="number" id="cfgTaskCap1317" class="form-input" min="50" step="20" value="600" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgFineCap912">Tope mensual multas 9–12 ($)</label>
+            <input type="number" id="cfgFineCap912" class="form-input" min="10" step="10" value="100" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgFineCap1317">Tope mensual multas 13–17 ($)</label>
+            <input type="number" id="cfgFineCap1317" class="form-input" min="10" step="10" value="200" required />
+          </div>
+        </div>
+        <div id="plansCostPreview" style="background: var(--bg-elevated); padding: 0.85rem; border-radius: var(--radius-sm); font-size: 0.82rem; margin-bottom: 1rem;"></div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.6rem;">
+          <button type="button" class="btn btn-ghost" data-close-dialog="dialogPlans">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Tasas y Límites</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- 14. Modal "¿Quién eres?" para confirmar hijo en dispositivos compartidos -->
+  <dialog class="app-dialog" id="dialogWhoAreYou">
+    <div class="dialog-inner">
+      <div class="dialog-header">
+        <h3 class="dialog-title inline-icon-text" id="whoAreYouTitle">¿Quién eres?</h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-dialog="dialogWhoAreYou" aria-label="Cerrar">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="whoAreYouList" style="display: flex; flex-direction: column; gap: 0.55rem;"></div>
     </div>
   </dialog>
 

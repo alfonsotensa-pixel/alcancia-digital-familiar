@@ -67,6 +67,12 @@ export function stripLegacyDemoData(state) {
   state.investments = filterDemo(state.investments);
   state.childRequests = filterDemo(state.childRequests);
   state.ledgerEvents = filterDemo(state.ledgerEvents);
+  state.tasks = (state.tasks || []).filter((t) => t && t.id && !state.family.deletedIds[t.id]);
+  state.taskClaims = filterDemo(state.taskClaims);
+  state.taskReviews = filterDemo(state.taskReviews);
+  if (Array.isArray(state.finePresets)) {
+    state.finePresets = state.finePresets.filter((p) => p && p.id && !state.family.deletedIds[p.id]);
+  }
 
   if (!state.members.some((m) => m.role === 'PARENT')) {
     state.members.unshift({
@@ -121,8 +127,14 @@ function mergeEntityCollection(localArr = [], remoteArr = [], deletedIdsMap = {}
     } else {
       const localTime = String(existing.updatedAt || existing.createdAt || '');
       const remoteTime = String(rItem.updatedAt || rItem.createdAt || '');
-      if (remoteTime >= localTime) {
+      if (remoteTime > localTime) {
         map.set(rItem.id, rItem);
+      } else if (remoteTime === localTime) {
+        // Desempate determinista (p.ej. dos papás firmando el mismo evento con ID determinista al mismo tiempo):
+        // gana el hash/huella menor para que todos los dispositivos converjan al mismo registro.
+        const lKey = String(existing.eventHash || JSON.stringify(existing));
+        const rKey = String(rItem.eventHash || JSON.stringify(rItem));
+        if (rKey < lKey) map.set(rItem.id, rItem);
       }
     }
   }
@@ -170,6 +182,10 @@ export function mergeFamilyCRDT(localState, remoteState) {
     investments: mergeEntityCollection(cleanLocal.investments, cleanRemote.investments, mergedDeletedIds),
     childRequests: mergeEntityCollection(cleanLocal.childRequests, cleanRemote.childRequests, mergedDeletedIds),
     ledgerEvents: mergeEntityCollection(cleanLocal.ledgerEvents, cleanRemote.ledgerEvents, mergedDeletedIds),
+    tasks: mergeEntityCollection(cleanLocal.tasks, cleanRemote.tasks, mergedDeletedIds),
+    taskClaims: mergeEntityCollection(cleanLocal.taskClaims, cleanRemote.taskClaims, mergedDeletedIds),
+    taskReviews: mergeEntityCollection(cleanLocal.taskReviews, cleanRemote.taskReviews, mergedDeletedIds),
+    finePresets: mergeEntityCollection(cleanLocal.finePresets, cleanRemote.finePresets, mergedDeletedIds),
     lastSyncedAt: new Date().toISOString()
   });
 }

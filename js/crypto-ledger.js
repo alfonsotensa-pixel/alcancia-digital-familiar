@@ -62,7 +62,23 @@ export function generateSaltHex(byteLength = 16) {
 }
 
 /**
+ * Serialización JSON estable (claves ordenadas) para firmar metadatos de forma determinista.
+ */
+export function stableStringify(value) {
+  if (value === null || value === undefined) return 'null';
+  if (Array.isArray(value)) return `[${value.map((v) => stableStringify(v)).join(',')}]`;
+  if (typeof value === 'object') {
+    const keys = Object.keys(value).filter((k) => value[k] !== undefined).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
  * Serialización canónica determinista de los campos contables críticos de un evento del Ledger.
+ * - sigVersion 1 (eventos antiguos): campos contables básicos.
+ * - sigVersion 2 (tareas, multas y planes de ahorro): además firma `metadata` (tope de multa, banda de edad,
+ *   tasa congelada del plan, etc.) para que ningún parámetro que afecte el saldo quede sin firma.
  */
 export function canonicalEventPayload(event) {
   const payload = {
@@ -78,6 +94,11 @@ export function canonicalEventPayload(event) {
     createdAt: String(event.createdAt || ''),
     prevHash: String(event.prevHash || 'GENESIS')
   };
+  if (Number(event.sigVersion || 1) >= 2) {
+    payload.sigVersion = 2;
+    payload.meta = stableStringify(event.metadata || {});
+    return stableStringify(payload);
+  }
   return JSON.stringify(payload);
 }
 
@@ -208,7 +229,8 @@ export async function createSignedLedgerEvent(rawEvent, signingKey, familySaltHe
     metadata: rawEvent.metadata || {},
     localDate: rawEvent.localDate,
     createdAt: rawEvent.createdAt || new Date().toISOString(),
-    prevHash: lastEventHash || 'GENESIS'
+    prevHash: lastEventHash || 'GENESIS',
+    sigVersion: 2
   };
 
   const canonical = canonicalEventPayload(event);
